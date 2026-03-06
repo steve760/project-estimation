@@ -335,6 +335,8 @@ export function ProjectDetailPage() {
     },
   });
 
+  const activeConsultants = consultants.filter((c) => !c.inactive);
+
   const { data: rateOverrides = [] } = useQuery({
     queryKey: ['project-consultant-rates', projectId],
     queryFn: async () => {
@@ -872,7 +874,7 @@ export function ProjectDetailPage() {
           />
           <Autocomplete
             size="small"
-            options={consultants}
+            options={activeConsultants}
             getOptionLabel={(c) => c.name}
             value={consultants.find((c) => c.id === activityToEdit?.consultantId) ?? null}
             onChange={(_, value) => setActivityToEdit((a) => (a ? { ...a, consultantId: value?.id ?? '' } : null))}
@@ -1137,7 +1139,7 @@ export function ProjectDetailPage() {
                   />
                   <Autocomplete
                     size="small"
-                    options={consultants}
+                    options={activeConsultants}
                     getOptionLabel={(c) => c.name}
                     value={consultants.find((c) => c.id === newRow.consultantId) ?? null}
                     onChange={(_, value) => setNewRow((r) => ({ ...r, consultantId: value?.id ?? '' }))}
