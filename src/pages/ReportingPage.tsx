@@ -184,11 +184,6 @@ export function ReportingPage() {
     enabled: !profileLoading,
   });
 
-  const projectIdsWithTime = useMemo(
-    () => [...new Set(timeEntries.map((e) => e.project_id))],
-    [timeEntries]
-  );
-
   const allProjectIds = useMemo(() => projects.map((p) => p.id), [projects]);
 
   const { data: taskStructure = { phases: [], activities: [], assignments: [] } } = useQuery({
@@ -278,7 +273,7 @@ export function ReportingPage() {
       map.set(key, (map.get(key) ?? 0) + toNum(e.hours));
     }
     const consultantList = consultants.filter((c) => consultantIds.has(c.id));
-    const data = weekRanges.map((range, weekIndex) => {
+    const data = weekRanges.map((_range, weekIndex) => {
       const row: Record<string, string | number> = {
         week: weekLabels[weekIndex],
         weekIndex,
@@ -328,7 +323,7 @@ export function ReportingPage() {
       if (projectBillable.get(e.project_id)) revenueByWeek[weekIndex] += hours * rate;
       costByWeek[weekIndex] += hours * costPerHr;
     }
-    return weekRanges.map((range, i) => ({
+    return weekRanges.map((_range, i) => ({
       week: weekLabels[i],
       revenue: Math.round(revenueByWeek[i] * 100) / 100,
       cost: Math.round(costByWeek[i] * 100) / 100,
@@ -595,9 +590,9 @@ export function ReportingPage() {
                             tickFormatter={(v) => `$${v}`}
                           />
                           <Tooltip
-                            formatter={(value: number, name: string) => [
-                              `$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-                              name === 'cost' ? 'Cost' : name === 'margin' ? 'Margin' : name,
+                            formatter={(value: number | undefined, name?: string) => [
+                              `$${Number(value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+                              name === 'cost' ? 'Cost' : name === 'margin' ? 'Margin' : name ?? '',
                             ]}
                             contentStyle={{
                               borderRadius: theme.shape.borderRadius,
@@ -662,7 +657,7 @@ export function ReportingPage() {
                             allowDecimals={false}
                           />
                           <Tooltip
-                            formatter={(value: number) => [value.toFixed(1), 'Hours']}
+                            formatter={(value: number | undefined) => [Number(value ?? 0).toFixed(1), 'Hours']}
                             contentStyle={{
                               borderRadius: theme.shape.borderRadius,
                               border: `1px solid ${theme.palette.divider}`,

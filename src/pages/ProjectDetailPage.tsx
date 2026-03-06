@@ -220,7 +220,7 @@ function groupRowsByActivity(flatRows: FlatRow[]): ActivityGroupRow[] {
 
 function GroupEditRow({
   assignment,
-  consultants,
+  consultants: _consultants,
   onUpdateHours,
   onDelete,
 }: {
@@ -253,117 +253,12 @@ function GroupEditRow({
   );
 }
 
-function SortableActivityRow({
-  id,
-  row,
-  cost,
-  isFirstInPhase,
-  isEditingHours,
-  editingHours,
-  setEditingHours,
-  onUpdateHours,
-  onEditActivity,
-  onDuplicate,
-  onDelete,
-  showFinancials = true,
-  nonBillable = false,
-}: {
-  id: string;
-  row: FlatRow;
-  cost: number;
-  isFirstInPhase: boolean;
-  isEditingHours: boolean;
-  editingHours: { id: string; value: string } | null;
-  setEditingHours: (v: { id: string; value: string } | null) => void;
-  onUpdateHours: (id: string, hours: number) => void;
-  onEditActivity: (row: FlatRow) => void;
-  onDuplicate: (row: FlatRow) => void;
-  onDelete: (id: string) => void;
-  showFinancials?: boolean;
-  nonBillable?: boolean;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
-
-  return (
-    <TableRow
-      ref={setNodeRef}
-      style={style}
-      sx={{ bgcolor: isDragging ? 'action.hover' : undefined, '& .MuiTableCell-root': { verticalAlign: 'middle' } }}
-    >
-      <TableCell sx={{ width: 40, p: 0.5, cursor: isDragging ? 'grabbing' : 'grab' }} {...listeners} {...attributes}>
-        <DragIcon fontSize="small" color="action" />
-      </TableCell>
-      <TableCell sx={isFirstInPhase ? { fontWeight: 700 } : undefined}>{row.phaseName}</TableCell>
-      <TableCell>{row.activityName}</TableCell>
-      <TableCell>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar sx={{ width: 32, height: 32, bgcolor: row.consultantColor ?? 'primary.main' }}>
-            {getInitials(row.consultantName)}
-          </Avatar>
-          {row.consultantName}
-        </Box>
-      </TableCell>
-      <TableCell align="center">
-        {isEditingHours && editingHours ? (
-          <TextField
-            type="number"
-            size="small"
-            value={editingHours.value}
-            inputProps={{ min: 0, step: 0.5 }}
-            sx={{ width: 80 }}
-            autoFocus
-            onBlur={() => {
-              const n = Number(editingHours.value);
-              if (!Number.isNaN(n) && n >= 0) onUpdateHours(row.assignmentId!, n);
-              setEditingHours(null);
-            }}
-            onChange={(e) => setEditingHours({ id: row.assignmentId!, value: e.target.value })}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const n = Number(editingHours.value);
-                if (!Number.isNaN(n) && n >= 0) onUpdateHours(row.assignmentId!, n);
-                setEditingHours(null);
-              }
-            }}
-          />
-        ) : (
-          <Box
-            component="span"
-            onClick={() => setEditingHours({ id: row.assignmentId!, value: String(row.hours) })}
-            sx={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
-          >
-            {row.hours}
-          </Box>
-        )}
-      </TableCell>
-      {showFinancials && (
-        <>
-          <TableCell align="right">${roundCurrency(cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
-        </>
-      )}
-      <TableCell>
-        <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
-          <IconButton size="small" onClick={() => onEditActivity(row)} title="Edit activity" sx={{ p: 0.75 }}>
-            <EditIcon fontSize="small" />
-          </IconButton>
-          <IconButton size="small" onClick={() => onDuplicate(row)} title="Duplicate row" sx={{ p: 0.75 }}>
-            <CopyIcon fontSize="small" />
-          </IconButton>
-          <IconButton size="small" onClick={() => onDelete(row.assignmentId!)} title="Delete row" sx={{ p: 0.75 }}>
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Box>
-      </TableCell>
-    </TableRow>
-  );
-}
-
 function SortableActivityGroupRow({
   id,
   group,
   totalHours,
   totalCost,
+  totalRevenue,
   isFirstInPhase,
   isEditingHours,
   editingHours,
@@ -372,8 +267,7 @@ function SortableActivityGroupRow({
   onEditActivity,
   onDuplicate,
   onDeleteAssignment,
-  consultants,
-  getChargeRate,
+  consultants: _consultants,
   showFinancials = true,
   nonBillable = false,
 }: {
@@ -381,6 +275,7 @@ function SortableActivityGroupRow({
   group: ActivityGroupRow;
   totalHours: number;
   totalCost: number;
+  totalRevenue: number;
   isFirstInPhase: boolean;
   isEditingHours: boolean;
   editingHours: { id: string; value: string } | null;
@@ -389,7 +284,7 @@ function SortableActivityGroupRow({
   onEditActivity: (group: ActivityGroupRow) => void;
   onDuplicate: (group: ActivityGroupRow) => void;
   onDeleteAssignment: (id: string) => void;
-  consultants: { id: string; name: string; cost_per_hour?: number }[];
+  consultants: { id: string; name: string; cost_per_hour?: number; charge_out_rate?: number }[];
   showFinancials?: boolean;
   nonBillable?: boolean;
 }) {
@@ -411,7 +306,6 @@ function SortableActivityGroupRow({
       <TableCell>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
           {group.assignments.map((a) => {
-            const consultant = consultants.find((c) => c.id === a.consultantId);
             return (
               <Box
                 key={a.assignmentId}
@@ -489,9 +383,16 @@ function SortableActivityGroupRow({
         )}
       </TableCell>
       {showFinancials && (
-        <TableCell align="right">
-          ${roundCurrency(totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-        </TableCell>
+        <>
+          {!nonBillable && (
+            <TableCell align="right">
+              ${roundCurrency(totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </TableCell>
+          )}
+          <TableCell align="right">
+            ${roundCurrency(totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </TableCell>
+        </>
       )}
       <TableCell>
         <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
@@ -744,7 +645,7 @@ export function ProjectDetailPage() {
       if (error) throw error;
       return (data ?? []) as ActivityAssignment[];
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (_data, _variables) => {
       if (!projectId) return;
       invalidate();
       queryClient.invalidateQueries({ queryKey: ['project-consultant-rates', projectId] });
@@ -962,16 +863,6 @@ export function ProjectDetailPage() {
     }
   };
 
-  const handleDuplicateRow = (row: FlatRow) => {
-    if (!row.assignmentId) return;
-    setDuplicateError(null);
-    duplicateAssignmentMutation.mutate({
-      activity_id: row.activityId,
-      hours: row.hours,
-      insert_after_sort_order: row.sortOrder,
-    });
-  };
-
   const handleDuplicateGroup = (group: ActivityGroupRow) => {
     setDuplicateError(null);
     const maxOrder = Math.max(...rows.map((r) => r.sortOrder), -1);
@@ -993,7 +884,7 @@ export function ProjectDetailPage() {
         const totalHours = group.assignments.reduce((s, a) => s + a.hours, 0);
         const totalCost = group.assignments.reduce((s, a) => {
           const c = consultants.find((x) => x.id === a.consultantId);
-          return s + (c ? a.hours * (c.cost_per_hour ?? 0) : 0);
+          return s + (c ? a.hours * (Number(c.cost_per_hour) || 0) : 0);
         }, 0);
         return `<tr><td>${group.phaseName}</td><td>${group.activityName}</td><td>${consultantNames}</td><td>${totalHours}</td><td>$${roundCurrency(totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>`;
       })
@@ -1001,7 +892,7 @@ export function ProjectDetailPage() {
     const costTotal = groupRows.reduce((sum, group) => {
       return sum + group.assignments.reduce((s, a) => {
         const c = consultants.find((x) => x.id === a.consultantId);
-        return s + (c ? a.hours * (c.cost_per_hour ?? 0) : 0);
+        return s + (c ? a.hours * (Number(c.cost_per_hour) || 0) : 0);
       }, 0);
     }, 0);
     const hoursTotal = groupRows.reduce((sum, group) => sum + group.assignments.reduce((s, a) => s + a.hours, 0), 0);
@@ -1014,7 +905,7 @@ export function ProjectDetailPage() {
         const totalHours = group.assignments.reduce((s, a) => s + a.hours, 0);
         const totalCost = group.assignments.reduce((s, a) => {
           const c = consultants.find((x) => x.id === a.consultantId);
-          return s + (c ? a.hours * (c.cost_per_hour ?? 0) : 0);
+          return s + (c ? a.hours * (Number(c.cost_per_hour) || 0) : 0);
         }, 0);
         return [group.phaseName, group.activityName, consultantNames, totalHours, `$${roundCurrency(totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}`].join('\t');
       }),
@@ -1421,6 +1312,9 @@ export function ProjectDetailPage() {
           }}
         >
           <Tab label="Project Activities" id="detail-tab-0" aria-controls="detail-tabpanel-0" />
+          {isAdmin && !nonBillable && (
+            <Tab label="Rate Overrides" id="detail-tab-1" aria-controls="detail-tabpanel-1" />
+          )}
         </Tabs>
         <CardContent sx={{ pt: 2 }}>
           <Box role="tabpanel" id="detail-tabpanel-0" aria-labelledby="detail-tab-0" hidden={detailTab !== 0}>
@@ -1449,6 +1343,9 @@ export function ProjectDetailPage() {
                 <TableCell sx={{ fontWeight: 700 }}>Activity</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Consultant</TableCell>
                 <TableCell align="center" sx={{ fontWeight: 700 }}>Hours</TableCell>
+                {isAdmin && !nonBillable && (
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Revenue</TableCell>
+                )}
                 {isAdmin && (
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Cost</TableCell>
                 )}
@@ -1464,8 +1361,14 @@ export function ProjectDetailPage() {
                 const totalHours = group.assignments.reduce((s, a) => s + a.hours, 0);
                 const totalCost = group.assignments.reduce((s, a) => {
                   const c = consultants.find((x) => x.id === a.consultantId);
-                  return s + (c ? a.hours * (c.cost_per_hour ?? 0) : 0);
+                  return s + (c ? a.hours * (Number(c.cost_per_hour) || 0) : 0);
                 }, 0);
+                const totalRevenue = nonBillable
+                  ? 0
+                  : group.assignments.reduce((s, a) => {
+                      const c = consultants.find((x) => x.id === a.consultantId);
+                      return s + (c ? a.hours * getChargeRate(c) : 0);
+                    }, 0);
                 const isFirstInPhase = dataIndex === 0 || groupRows[dataIndex - 1].phaseId !== group.phaseId;
                 const isEditingHours = !!group.assignments.find((a) => a.assignmentId && editingHours?.id === a.assignmentId);
                 return (
@@ -1475,6 +1378,7 @@ export function ProjectDetailPage() {
                     group={group}
                     totalHours={totalHours}
                     totalCost={totalCost}
+                    totalRevenue={totalRevenue}
                     isFirstInPhase={isFirstInPhase}
                     isEditingHours={isEditingHours}
                     editingHours={editingHours}
@@ -1496,6 +1400,11 @@ export function ProjectDetailPage() {
                 <TableCell align="right" sx={{ fontWeight: 700, py: 1.5 }}>
                   {groupRows.reduce((s, g) => s + g.assignments.reduce((sum, a) => sum + a.hours, 0), 0).toFixed(1)}
                 </TableCell>
+                {isAdmin && !nonBillable && (
+                  <TableCell align="right" sx={{ fontWeight: 700, py: 1.5 }}>
+                    ${roundCurrency(summary.revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </TableCell>
+                )}
                 {isAdmin && (
                   <TableCell align="right" sx={{ fontWeight: 700, py: 1.5 }}>
                     ${roundCurrency(summary.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -1664,6 +1573,65 @@ export function ProjectDetailPage() {
             )}
           </Box>
 
+          {isAdmin && !nonBillable && (
+            <Box role="tabpanel" id="detail-tabpanel-1" aria-labelledby="detail-tab-1" hidden={detailTab !== 1}>
+              {detailTab === 1 && (
+                <>
+                  <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
+                    Consultant rate overrides
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Override charge-out rates for this project. Leave blank to use the consultant&apos;s default rate.
+                  </Typography>
+                  {projectConsultants.length > 0 ? (
+                    <>
+                      <Table size="small" sx={{ maxWidth: 480, '& .MuiTableCell-root': { verticalAlign: 'middle' } }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 700 }}>Consultant</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 700 }}>Default ($/hr)</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 700 }}>Override ($/hr)</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {projectConsultants.map((c) => (
+                            <TableRow key={c.id}>
+                              <TableCell>{c.name}</TableCell>
+                              <TableCell align="right">${Number(c.charge_out_rate).toFixed(2)}</TableCell>
+                              <TableCell align="right">
+                                <TextField
+                                  type="number"
+                                  size="small"
+                                  placeholder="Use default"
+                                  value={rateOverrideInputs[c.id] ?? rateOverrides.find((r) => r.consultant_id === c.id)?.charge_out_rate ?? ''}
+                                  onChange={(e) => setRateOverrideInputs((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                                  inputProps={{ min: 0, step: 0.01 }}
+                                  sx={{ width: 100 }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={handleSaveRateOverrides}
+                        disabled={savingOverrides || saveRateOverrideMutation.isPending || clearRateOverrideMutation.isPending}
+                        sx={{ mt: 1 }}
+                      >
+                        {savingOverrides ? 'Saving…' : 'Save overrides'}
+                      </Button>
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Add activities with consultants to this project to set rate overrides.
+                    </Typography>
+                  )}
+                </>
+              )}
+            </Box>
+          )}
         </CardContent>
       </Card>
     </Box>

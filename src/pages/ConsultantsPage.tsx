@@ -291,7 +291,7 @@ export function ConsultantsPage() {
             sortable: true,
             align: 'center' as const,
             headerAlign: 'center' as const,
-            valueGetter: (_value, row) => row.role ?? 'user',
+            valueGetter: (_value: unknown, row: Consultant) => row.role ?? 'user',
             renderCell: ({ row }: { row: Consultant }) => (
               <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', alignItems: 'center', minHeight: 65, minWidth: 100 }}>
                 <FormControl size="small" fullWidth>
@@ -333,7 +333,7 @@ export function ConsultantsPage() {
             headerName: 'Linked user',
             width: 220,
             sortable: false,
-            valueGetter: (_value, row) => row.user_id ?? '',
+            valueGetter: (_value: unknown, row: Consultant) => row.user_id ?? '',
             renderCell: ({ row }: { row: Consultant }) => (
               <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', alignItems: 'center', minHeight: 65, width: '100%' }}>
                 <FormControl size="small" fullWidth>

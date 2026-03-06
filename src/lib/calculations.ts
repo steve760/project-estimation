@@ -25,9 +25,10 @@ export function computeFinancialSummary(
   let cost = 0;
   let revenue = 0;
   for (const { hours, consultant } of assignments) {
-    cost += hours * consultant.cost_per_hour;
+    const costPerHr = Number(consultant.cost_per_hour);
+    cost += hours * (Number.isNaN(costPerHr) ? 0 : costPerHr);
     const rate = chargeOutOverrides?.get(consultant.id) ?? consultant.charge_out_rate;
-    revenue += hours * rate;
+    revenue += hours * (Number(rate) || 0);
   }
   const profit = revenue - cost;
   const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;

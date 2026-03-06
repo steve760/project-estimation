@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box,
@@ -66,7 +66,6 @@ function toDateString(d: Date): string {
 export function ReportingProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { isAdmin, profileLoading } = useAuth();
   const theme = useTheme();
   const monthParam = searchParams.get('month'); // YYYY-MM
@@ -193,7 +192,7 @@ export function ReportingProjectPage() {
 
   const {
     totalHours,
-    totalAllocatedHours,
+    totalAllocatedHours: _totalAllocatedHours,
     remainingHours,
     totalCost,
     totalBillableAmount,
@@ -400,7 +399,7 @@ export function ReportingProjectPage() {
       consultantIds.add(e.consultant_id);
     }
     const consultantListForWeekChart = consultants.filter((c) => consultantIds.has(c.id));
-    const data = weekRanges.map((range, weekIndex) => {
+    const data = weekRanges.map((_range, weekIndex) => {
       const row: Record<string, string | number> = { week: weekLabels[weekIndex], weekIndex };
       for (const c of consultantListForWeekChart) {
         row[c.id] = map.get(`${weekIndex}|${c.id}`) ?? 0;
@@ -565,7 +564,7 @@ export function ReportingProjectPage() {
                     allowDecimals={false}
                   />
                   <Tooltip
-                    formatter={(value: number) => [toNum(value).toFixed(1), 'Hours']}
+                    formatter={(value: number | undefined) => [toNum(value ?? 0).toFixed(1), 'Hours']}
                     contentStyle={{
                       borderRadius: theme.shape.borderRadius,
                       border: `1px solid ${theme.palette.divider}`,
@@ -617,20 +616,20 @@ export function ReportingProjectPage() {
                     allowDecimals={false}
                   />
                   <Tooltip
-                    formatter={(value: number, name: string, props: any) => {
-                      const payload = props?.payload as { revenue?: number; cost?: number } | undefined;
+                    formatter={(value: number | undefined, name?: string, props?: unknown) => {
+                      const payload = (props as { payload?: { revenue?: number; cost?: number } })?.payload;
                       const revenue = toNum(payload?.revenue ?? 0);
                       if (name === 'Cost') {
                         const pct = revenue > 0 ? (toNum(payload?.cost ?? 0) / revenue) * 100 : 0;
                         return [
-                          `${value.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${pct.toFixed(
+                          `${Number(value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} (${pct.toFixed(
                             1
                           )}%)`,
                           'Cost',
                         ];
                       }
                       return [
-                        value.toLocaleString('en-US', { minimumFractionDigits: 2 }),
+                        Number(value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 }),
                         'Margin',
                       ];
                     }}
@@ -682,7 +681,7 @@ export function ReportingProjectPage() {
                     allowDecimals={false}
                   />
                   <Tooltip
-                    formatter={(value: number) => [toNum(value).toFixed(1), 'Hours']}
+                    formatter={(value: number | undefined) => [toNum(value ?? 0).toFixed(1), 'Hours']}
                     contentStyle={{
                       borderRadius: theme.shape.borderRadius,
                       border: `1px solid ${theme.palette.divider}`,

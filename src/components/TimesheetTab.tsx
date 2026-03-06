@@ -67,7 +67,7 @@ interface TimesheetTabProps {
 
 export function TimesheetTab({
   projectId,
-  projectName,
+  projectName: _projectName,
   phases,
   isAdmin,
   consultantId,
