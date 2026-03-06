@@ -13,6 +13,7 @@ import {
   Alert,
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email'),
@@ -64,6 +65,11 @@ export function LoginPage() {
           <Typography variant="h6" gutterBottom fontWeight={600} sx={{ textAlign: 'center', mb: 2, fontSize: '1rem' }}>
             Project cost estimation
           </Typography>
+          {!isSupabaseConfigured && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Sign-in is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your deployment environment (e.g. Vercel).
+            </Alert>
+          )}
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
