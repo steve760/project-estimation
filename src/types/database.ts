@@ -12,6 +12,7 @@ export interface Consultant {
   cost_per_hour: number;
   charge_out_rate: number;
   avatar_url?: string | null;
+  color?: string | null;
   created_at: string;
   updated_at: string;
 }

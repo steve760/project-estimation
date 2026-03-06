@@ -150,6 +150,7 @@ type FlatRow = {
   consultantId: string;
   consultantName: string;
   consultantAvatarUrl: string | null;
+  consultantColor: string | null;
   hours: number;
   sortOrder: number;
 };
@@ -168,6 +169,7 @@ function flattenProjectToRows(project: { phases?: PhaseWithActivitiesDisplay[] }
             consultantId: a.consultant_id,
             consultantName: a.consultant?.name ?? '—',
             consultantAvatarUrl: a.consultant?.avatar_url ?? null,
+            consultantColor: a.consultant?.color ?? null,
             hours: a.hours,
             sortOrder: a.sort_order ?? 0,
           });
@@ -182,6 +184,7 @@ function SortableActivityRow({
   row,
   cost,
   revenue,
+  isFirstInPhase,
   isEditingHours,
   editingHours,
   setEditingHours,
@@ -194,6 +197,7 @@ function SortableActivityRow({
   row: FlatRow;
   cost: number;
   revenue: number;
+  isFirstInPhase: boolean;
   isEditingHours: boolean;
   editingHours: { id: string; value: string } | null;
   setEditingHours: (v: { id: string; value: string } | null) => void;
@@ -214,11 +218,11 @@ function SortableActivityRow({
       <TableCell sx={{ width: 40, p: 0.5, cursor: isDragging ? 'grabbing' : 'grab' }} {...listeners} {...attributes}>
         <DragIcon fontSize="small" color="action" />
       </TableCell>
-      <TableCell>{row.phaseName}</TableCell>
+      <TableCell sx={isFirstInPhase ? { fontWeight: 700 } : undefined}>{row.phaseName}</TableCell>
       <TableCell>{row.activityName}</TableCell>
       <TableCell>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar sx={{ width: 32, height: 32 }}>
+          <Avatar sx={{ width: 32, height: 32, bgcolor: row.consultantColor ?? 'primary.main' }}>
             {getInitials(row.consultantName)}
           </Avatar>
           {row.consultantName}
@@ -298,7 +302,14 @@ export function ProjectDetailPage() {
     hours: '',
   });
   const [editingHours, setEditingHours] = useState<{ id: string; value: string } | null>(null);
-  const [activityToEdit, setActivityToEdit] = useState<{ id: string; name: string } | null>(null);
+  const [activityToEdit, setActivityToEdit] = useState<{
+    assignmentId: string;
+    activityId: string;
+    activityName: string;
+    phaseName: string;
+    consultantId: string;
+    hours: number;
+  } | null>(null);
   const [addRowError, setAddRowError] = useState<string | null>(null);
   const [rateOverrideInputs, setRateOverrideInputs] = useState<Record<string, string>>({});
   const [savingOverrides, setSavingOverrides] = useState(false);
@@ -375,10 +386,7 @@ export function ProjectDetailPage() {
       const { error } = await supabase.from('activities').update({ name }).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      invalidate();
-      setActivityToEdit(null);
-    },
+    onSuccess: () => invalidate(),
   });
 
   const createAssignmentMutation = useMutation({
@@ -438,8 +446,10 @@ export function ProjectDetailPage() {
   });
 
   const updateAssignmentMutation = useMutation({
-    mutationFn: async ({ id, hours }: { id: string; hours: number }) => {
-      const { error } = await supabase.from('activity_assignments').update({ hours }).eq('id', id);
+    mutationFn: async ({ id, hours, consultant_id }: { id: string; hours: number; consultant_id?: string }) => {
+      const payload: { hours: number; consultant_id?: string } = { hours };
+      if (consultant_id !== undefined) payload.consultant_id = consultant_id;
+      const { error } = await supabase.from('activity_assignments').update(payload).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -823,31 +833,66 @@ export function ProjectDetailPage() {
 
       <Dialog
         open={!!activityToEdit}
-        onClose={() => !updateActivityMutation.isPending && setActivityToEdit(null)}
-        maxWidth="xs"
+        onClose={() => !updateActivityMutation.isPending && !updateAssignmentMutation.isPending && setActivityToEdit(null)}
+        maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Edit activity</DialogTitle>
+        <DialogTitle>Edit row</DialogTitle>
         <DialogContent>
+          <TextField
+            fullWidth
+            label="Phase"
+            value={activityToEdit?.phaseName ?? ''}
+            disabled
+            sx={{ mt: 1, mb: 2 }}
+            helperText="Read-only"
+          />
           <TextField
             autoFocus
             fullWidth
             label="Activity name"
-            value={activityToEdit?.name ?? ''}
-            onChange={(e) => setActivityToEdit((a) => (a ? { ...a, name: e.target.value } : null))}
-            sx={{ mt: 1 }}
+            value={activityToEdit?.activityName ?? ''}
+            onChange={(e) => setActivityToEdit((a) => (a ? { ...a, activityName: e.target.value } : null))}
+            sx={{ mb: 2 }}
+          />
+          <Autocomplete
+            size="small"
+            options={consultants}
+            getOptionLabel={(c) => c.name}
+            value={consultants.find((c) => c.id === activityToEdit?.consultantId) ?? null}
+            onChange={(_, value) => setActivityToEdit((a) => (a ? { ...a, consultantId: value?.id ?? '' } : null))}
+            renderInput={(params) => <TextField {...params} label="Consultant" />}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            type="number"
+            label="Hours"
+            value={activityToEdit?.hours ?? ''}
+            onChange={(e) => setActivityToEdit((a) => (a ? { ...a, hours: Number(e.target.value) || 0 } : null))}
+            inputProps={{ min: 0, step: 0.5 }}
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setActivityToEdit(null)} disabled={updateActivityMutation.isPending}>
+          <Button onClick={() => setActivityToEdit(null)} disabled={updateActivityMutation.isPending || updateAssignmentMutation.isPending}>
             Cancel
           </Button>
           <Button
             variant="contained"
-            onClick={() => activityToEdit && updateActivityMutation.mutate({ id: activityToEdit.id, name: activityToEdit.name })}
-            disabled={!activityToEdit?.name.trim() || updateActivityMutation.isPending}
+            onClick={() => {
+              if (!activityToEdit) return;
+              updateActivityMutation.mutate({ id: activityToEdit.activityId, name: activityToEdit.activityName }, {
+                onSuccess: () => {
+                  updateAssignmentMutation.mutate(
+                    { id: activityToEdit.assignmentId, hours: activityToEdit.hours, consultant_id: activityToEdit.consultantId || undefined },
+                    { onSuccess: () => setActivityToEdit(null) }
+                  );
+                },
+              });
+            }}
+            disabled={!activityToEdit?.activityName.trim() || updateActivityMutation.isPending || updateAssignmentMutation.isPending}
           >
-            {updateActivityMutation.isPending ? 'Saving…' : 'Save'}
+            {(updateActivityMutation.isPending || updateAssignmentMutation.isPending) ? 'Saving…' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -932,29 +977,40 @@ export function ProjectDetailPage() {
                 items={rows.filter((r) => r.assignmentId).map((r) => r.assignmentId!)}
                 strategy={verticalListSortingStrategy}
               >
-              {rows.map((row) => {
-                if (!row.assignmentId) return null;
-                const consultant = consultants.find((c) => c.id === row.consultantId);
-                const cost = consultant ? row.hours * consultant.cost_per_hour : 0;
-                const revenue = consultant ? row.hours * getChargeRate(consultant) : 0;
-                const isEditingHours = editingHours?.id === row.assignmentId;
-                return (
-                  <SortableActivityRow
-                    key={row.assignmentId}
-                    id={row.assignmentId}
-                    row={row}
-                    cost={cost}
-                    revenue={revenue}
-                    isEditingHours={!!isEditingHours}
-                    editingHours={editingHours}
-                    setEditingHours={setEditingHours}
-                    onUpdateHours={(id, hours) => updateAssignmentMutation.mutate({ id, hours })}
-                    onEditActivity={(row) => setActivityToEdit({ id: row.activityId, name: row.activityName })}
-                    onDuplicate={handleDuplicateRow}
-                    onDelete={(id) => deleteAssignmentMutation.mutate(id)}
-                  />
-                );
-              })}
+              {(() => {
+                const dataRows = rows.filter((r) => r.assignmentId);
+                return dataRows.map((row, dataIndex) => {
+                  const consultant = consultants.find((c) => c.id === row.consultantId);
+                  const cost = consultant ? row.hours * consultant.cost_per_hour : 0;
+                  const revenue = consultant ? row.hours * getChargeRate(consultant) : 0;
+                  const isEditingHoursRow = editingHours?.id === row.assignmentId;
+                  const isFirstInPhase = dataIndex === 0 || dataRows[dataIndex - 1].phaseId !== row.phaseId;
+                  return (
+                    <SortableActivityRow
+                      key={row.assignmentId}
+                      id={row.assignmentId!}
+                      row={row}
+                      cost={cost}
+                      revenue={revenue}
+                      isFirstInPhase={isFirstInPhase}
+                      isEditingHours={!!isEditingHoursRow}
+                      editingHours={editingHours}
+                      setEditingHours={setEditingHours}
+                      onUpdateHours={(id, hours) => updateAssignmentMutation.mutate({ id, hours })}
+                      onEditActivity={(row) => setActivityToEdit({
+                        assignmentId: row.assignmentId!,
+                        activityId: row.activityId,
+                        activityName: row.activityName,
+                        phaseName: row.phaseName,
+                        consultantId: row.consultantId,
+                        hours: row.hours,
+                      })}
+                      onDuplicate={handleDuplicateRow}
+                      onDelete={(id) => deleteAssignmentMutation.mutate(id)}
+                    />
+                  );
+                });
+              })()}
               </SortableContext>
               <TableRow sx={{ bgcolor: 'grey.100', fontWeight: 700, '& .MuiTableCell-root': { verticalAlign: 'middle' } }}>
                 <TableCell />
@@ -988,7 +1044,7 @@ export function ProjectDetailPage() {
                   sx={{
                     mt: 2,
                     p: 2,
-                    bgcolor: 'white',
+                    bgcolor: 'secondary.light',
                     border: '1px solid',
                     borderColor: 'divider',
                     borderRadius: 1,

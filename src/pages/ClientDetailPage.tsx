@@ -204,6 +204,7 @@ export function ClientDetailPage() {
           }
           const summary = computeFinancialSummary(projectAssignments);
           const grossProfit = summary.profit;
+          const marginPercent = summary.marginPercent;
           const uniqueConsultants = [...new Map(projectAssignments.map((p) => [p.consultant.id, p.consultant])).values()];
 
           return (
@@ -243,10 +244,27 @@ export function ClientDetailPage() {
                       ${roundCurrency(grossProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </Typography>
                   </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">GP %</Typography>
+                    <Typography variant="body1" fontWeight={600} color={marginPercent >= 0 ? 'success.main' : 'error.main'}>
+                      {marginPercent.toFixed(1)}%
+                    </Typography>
+                  </Box>
                   {uniqueConsultants.length > 0 && (
                     <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', ml: 'auto', alignItems: 'flex-end' }}>
                       {uniqueConsultants.map((c) => (
-                        <Chip key={c.id} label={c.name} size="small" color="primary" variant="outlined" sx={{ fontWeight: 500 }} />
+                        <Chip
+                          key={c.id}
+                          label={c.name}
+                          size="small"
+                          variant="outlined"
+                          sx={{
+                            fontWeight: 500,
+                            borderColor: c.color ?? 'primary.main',
+                            color: c.color ?? 'primary.main',
+                            backgroundColor: c.color ? `${c.color}18` : undefined,
+                          }}
+                        />
                       ))}
                     </Box>
                   )}

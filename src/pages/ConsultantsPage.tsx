@@ -35,6 +35,11 @@ const numberFromString = z.union([z.string(), z.number()]).transform((v) =>
   typeof v === 'string' ? (v === '' ? 0 : Number(v)) : v
 ).pipe(z.number().min(0, 'Must be ≥ 0'));
 
+const CONSULTANT_COLORS = [
+  '#6D5CBE', '#B69AF2', '#10b981', '#ef4444', '#f59e0b',
+  '#3b82f6', '#ec4899', '#14b8a6', '#8b5cf6', '#f97316',
+];
+
 const consultantSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   cost_per_hour: numberFromString,
@@ -53,14 +58,13 @@ async function fetchConsultants() {
   return (data ?? []) as Consultant[];
 }
 
-async function createConsultant(input: ConsultantForm) {
+async function createConsultant(input: ConsultantForm & { color?: string }) {
+  const { color, ...rest } = input;
+  const payload: Record<string, unknown> = { ...rest };
+  if (color) payload.color = color;
   const { data, error } = await supabase
     .from('consultants')
-    .insert({
-      name: input.name,
-      cost_per_hour: input.cost_per_hour,
-      charge_out_rate: input.charge_out_rate,
-    })
+    .insert(payload)
     .select()
     .single();
   if (error) throw error;
@@ -138,7 +142,10 @@ export function ConsultantsPage() {
 
   const onSubmit = (data: ConsultantForm) => {
     if (editingId) updateMutation.mutate({ id: editingId, input: data });
-    else createMutation.mutate(data);
+    else {
+      const color = CONSULTANT_COLORS[consultants.length % CONSULTANT_COLORS.length];
+      createMutation.mutate({ ...data, color });
+    }
   };
 
   const columns: GridColDef<Consultant>[] = [
@@ -149,7 +156,13 @@ export function ConsultantsPage() {
       minWidth: 180,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar sx={{ width: 32, height: 32 }}>
+          <Avatar
+            sx={{
+              width: 32,
+              height: 32,
+              bgcolor: row.color ?? 'primary.main',
+            }}
+          >
             {getInitials(row.name)}
           </Avatar>
           <Typography variant="body2">{row.name}</Typography>
@@ -228,7 +241,13 @@ export function ConsultantsPage() {
           <DialogContent>
             {editingId && (
               <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Avatar sx={{ width: 64, height: 64 }}>
+                <Avatar
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    bgcolor: consultants.find((c) => c.id === editingId)?.color ?? 'primary.main',
+                  }}
+                >
                   {getInitials(consultants.find((c) => c.id === editingId)?.name ?? '')}
                 </Avatar>
               </Box>
