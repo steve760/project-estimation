@@ -306,6 +306,7 @@ export function ProjectDetailPage() {
     assignmentId: string;
     activityId: string;
     activityName: string;
+    phaseId: string;
     phaseName: string;
     consultantId: string;
     hours: number;
@@ -382,8 +383,10 @@ export function ProjectDetailPage() {
   });
 
   const updateActivityMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const { error } = await supabase.from('activities').update({ name }).eq('id', id);
+    mutationFn: async ({ id, name, phase_id }: { id: string; name: string; phase_id?: string }) => {
+      const payload: { name: string; phase_id?: string } = { name };
+      if (phase_id !== undefined) payload.phase_id = phase_id;
+      const { error } = await supabase.from('activities').update(payload).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => invalidate(),
@@ -838,22 +841,22 @@ export function ProjectDetailPage() {
         fullWidth
       >
         <DialogTitle>Edit row</DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Phase"
-            value={activityToEdit?.phaseName ?? ''}
-            disabled
-            sx={{ mt: 1, mb: 2 }}
-            helperText="Read-only"
+        <DialogContent sx={{ '& .MuiFormControl-root': { mb: 3 } }}>
+          <Autocomplete
+            size="small"
+            options={phases}
+            getOptionLabel={(p) => p.name}
+            value={phases.find((p) => p.id === activityToEdit?.phaseId) ?? null}
+            onChange={(_, value) => setActivityToEdit((a) => (a && value ? { ...a, phaseId: value.id, phaseName: value.name } : a))}
+            renderInput={(params) => <TextField {...params} label="Phase" sx={{ mt: 1 }} />}
+            sx={{ mb: 3 }}
           />
           <TextField
-            autoFocus
             fullWidth
             label="Activity name"
             value={activityToEdit?.activityName ?? ''}
             onChange={(e) => setActivityToEdit((a) => (a ? { ...a, activityName: e.target.value } : null))}
-            sx={{ mb: 2 }}
+            sx={{ mb: 3 }}
           />
           <Autocomplete
             size="small"
@@ -862,7 +865,7 @@ export function ProjectDetailPage() {
             value={consultants.find((c) => c.id === activityToEdit?.consultantId) ?? null}
             onChange={(_, value) => setActivityToEdit((a) => (a ? { ...a, consultantId: value?.id ?? '' } : null))}
             renderInput={(params) => <TextField {...params} label="Consultant" />}
-            sx={{ mb: 2 }}
+            sx={{ mb: 3 }}
           />
           <TextField
             fullWidth
@@ -881,16 +884,19 @@ export function ProjectDetailPage() {
             variant="contained"
             onClick={() => {
               if (!activityToEdit) return;
-              updateActivityMutation.mutate({ id: activityToEdit.activityId, name: activityToEdit.activityName }, {
-                onSuccess: () => {
-                  updateAssignmentMutation.mutate(
-                    { id: activityToEdit.assignmentId, hours: activityToEdit.hours, consultant_id: activityToEdit.consultantId || undefined },
-                    { onSuccess: () => setActivityToEdit(null) }
-                  );
-                },
-              });
+              updateActivityMutation.mutate(
+                { id: activityToEdit.activityId, name: activityToEdit.activityName, phase_id: activityToEdit.phaseId },
+                {
+                  onSuccess: () => {
+                    updateAssignmentMutation.mutate(
+                      { id: activityToEdit.assignmentId, hours: activityToEdit.hours, consultant_id: activityToEdit.consultantId || undefined },
+                      { onSuccess: () => setActivityToEdit(null) }
+                    );
+                  },
+                }
+              );
             }}
-            disabled={!activityToEdit?.activityName.trim() || updateActivityMutation.isPending || updateAssignmentMutation.isPending}
+            disabled={!activityToEdit?.activityName.trim() || !activityToEdit?.phaseId || updateActivityMutation.isPending || updateAssignmentMutation.isPending}
           >
             {(updateActivityMutation.isPending || updateAssignmentMutation.isPending) ? 'Saving…' : 'Save'}
           </Button>
@@ -1001,6 +1007,7 @@ export function ProjectDetailPage() {
                         assignmentId: row.assignmentId!,
                         activityId: row.activityId,
                         activityName: row.activityName,
+                        phaseId: row.phaseId,
                         phaseName: row.phaseName,
                         consultantId: row.consultantId,
                         hours: row.hours,
@@ -1053,6 +1060,7 @@ export function ProjectDetailPage() {
                     flexWrap: 'wrap',
                     alignItems: 'center',
                     gap: 2,
+                    '& .MuiOutlinedInput-root': { backgroundColor: 'background.paper' },
                   }}
                 >
                   <Autocomplete
@@ -1153,10 +1161,10 @@ export function ProjectDetailPage() {
           <Box role="tabpanel" id="detail-tabpanel-1" aria-labelledby="detail-tab-1" hidden={detailTab !== 1}>
             {detailTab === 1 && (
               <>
-                <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+                <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
                   Consultant rate overrides
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                   Override charge-out rates for this project. Leave blank to use the consultant&apos;s default rate.
                 </Typography>
                 {projectConsultants.length > 0 ? (
