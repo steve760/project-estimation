@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   Box,
   Button,
@@ -265,7 +265,7 @@ function SortableActivityRow({
       <TableCell align="right">${roundCurrency(cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
       <TableCell align="right">${roundCurrency(revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
       <TableCell>
-        <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
+        <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
           <IconButton size="small" onClick={() => onEditActivity(row)} title="Edit activity" sx={{ p: 0.75 }}>
             <EditIcon fontSize="small" />
           </IconButton>
@@ -336,6 +336,15 @@ export function ProjectDetailPage() {
   });
 
   const activeConsultants = consultants.filter((c) => !c.inactive);
+
+  const editModalConsultantOptions = useMemo(() => {
+    if (!activityToEdit?.consultantId) return activeConsultants;
+    const current = consultants.find((c) => c.id === activityToEdit.consultantId);
+    if (current && current.inactive) {
+      return [current, ...activeConsultants.filter((c) => c.id !== current.id)];
+    }
+    return activeConsultants;
+  }, [activeConsultants, consultants, activityToEdit?.consultantId]);
 
   const { data: rateOverrides = [] } = useQuery({
     queryKey: ['project-consultant-rates', projectId],
@@ -874,7 +883,7 @@ export function ProjectDetailPage() {
           />
           <Autocomplete
             size="small"
-            options={activeConsultants}
+            options={editModalConsultantOptions}
             getOptionLabel={(c) => c.name}
             value={consultants.find((c) => c.id === activityToEdit?.consultantId) ?? null}
             onChange={(_, value) => setActivityToEdit((a) => (a ? { ...a, consultantId: value?.id ?? '' } : null))}
