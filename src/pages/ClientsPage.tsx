@@ -9,12 +9,14 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogContentText,
   DialogActions,
   TextField,
   Avatar,
+  IconButton,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -55,11 +57,17 @@ async function updateClient(id: string, input: ClientForm) {
   return data as Client;
 }
 
+async function deleteClient(id: string) {
+  const { error } = await supabase.from('clients').delete().eq('id', id);
+  if (error) throw error;
+}
+
 export function ClientsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['clients'],
@@ -82,6 +90,14 @@ export function ClientsPage() {
       setModalOpen(false);
       setEditingId(null);
       reset();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteClient,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      setClientToDelete(null);
     },
   });
 
@@ -123,10 +139,24 @@ export function ClientsPage() {
         </Box>
       ),
     },
+    {
+      field: 'actions',
+      headerName: '',
+      width: 56,
+      sortable: false,
+      disableColumnMenu: true,
+      renderCell: ({ row }) => (
+        <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'inline-block' }}>
+          <IconButton size="small" onClick={() => setClientToDelete(row)} title="Delete client" color="error">
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      ),
+    },
   ];
 
   return (
-    <Box sx={{ maxWidth: 1600, width: '100%', mx: 'auto' }}>
+    <Box sx={{ maxWidth: 1600, width: '100%' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <div>
           <Typography variant="h4" fontWeight={600}>
@@ -187,6 +217,32 @@ export function ClientsPage() {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      <Dialog
+        open={!!clientToDelete}
+        onClose={() => !deleteMutation.isPending && setClientToDelete(null)}
+        aria-labelledby="delete-client-dialog-title"
+      >
+        <DialogTitle id="delete-client-dialog-title">Are you sure?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Delete client &quot;{clientToDelete?.name}&quot;? This will permanently delete the client and all their projects, phases, activities and assignments. This cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClientToDelete(null)} disabled={deleteMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => clientToDelete && deleteMutation.mutate(clientToDelete.id)}
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

@@ -116,7 +116,7 @@ export function AppLayout() {
           minHeight: '100vh',
         }}
       >
-        <Breadcrumbs />
+        {!location.pathname.match(/^\/clients\/[^/]+$/) && <Breadcrumbs />}
         <Outlet />
       </Box>
     </Box>

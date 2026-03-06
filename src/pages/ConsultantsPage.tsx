@@ -186,7 +186,7 @@ export function ConsultantsPage() {
   ];
 
   return (
-    <Box>
+    <Box sx={{ maxWidth: 1600, width: '100%' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <div>
           <Typography variant="h4" fontWeight={600}>

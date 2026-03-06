@@ -9,7 +9,6 @@ import {
   Typography,
   TextField,
   IconButton,
-  Select,
   MenuItem,
   Menu,
   Table,
@@ -29,7 +28,7 @@ import {
   DialogContentText,
   DialogActions,
 } from '@mui/material';
-import { ArrowBack as BackIcon, Delete as DeleteIcon, Save as SaveIcon, ContentCopy as CopyIcon, DragIndicator as DragIcon, Settings as SettingsIcon } from '@mui/icons-material';
+import { ArrowBack as BackIcon, Delete as DeleteIcon, Save as SaveIcon, ContentCopy as CopyIcon, DragIndicator as DragIcon, Settings as SettingsIcon, Edit as EditIcon } from '@mui/icons-material';
 import {
   DndContext,
   closestCenter,
@@ -187,6 +186,7 @@ function SortableActivityRow({
   editingHours,
   setEditingHours,
   onUpdateHours,
+  onEditActivity,
   onDuplicate,
   onDelete,
 }: {
@@ -198,6 +198,7 @@ function SortableActivityRow({
   editingHours: { id: string; value: string } | null;
   setEditingHours: (v: { id: string; value: string } | null) => void;
   onUpdateHours: (id: string, hours: number) => void;
+  onEditActivity: (row: FlatRow) => void;
   onDuplicate: (row: FlatRow) => void;
   onDelete: (id: string) => void;
 }) {
@@ -260,6 +261,9 @@ function SortableActivityRow({
       <TableCell align="right">${roundCurrency(revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
       <TableCell>
         <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
+          <IconButton size="small" onClick={() => onEditActivity(row)} title="Edit activity" sx={{ p: 0.75 }}>
+            <EditIcon fontSize="small" />
+          </IconButton>
           <IconButton size="small" onClick={() => onDuplicate(row)} title="Duplicate row" sx={{ p: 0.75 }}>
             <CopyIcon fontSize="small" />
           </IconButton>
@@ -294,6 +298,7 @@ export function ProjectDetailPage() {
     hours: '',
   });
   const [editingHours, setEditingHours] = useState<{ id: string; value: string } | null>(null);
+  const [activityToEdit, setActivityToEdit] = useState<{ id: string; name: string } | null>(null);
   const [addRowError, setAddRowError] = useState<string | null>(null);
   const [rateOverrideInputs, setRateOverrideInputs] = useState<Record<string, string>>({});
   const [savingOverrides, setSavingOverrides] = useState(false);
@@ -363,6 +368,17 @@ export function ProjectDetailPage() {
       return data as { id: string };
     },
     onSuccess: () => invalidate(),
+  });
+
+  const updateActivityMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from('activities').update({ name }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidate();
+      setActivityToEdit(null);
+    },
   });
 
   const createAssignmentMutation = useMutation({
@@ -546,7 +562,7 @@ export function ProjectDetailPage() {
 
   if (isError) {
     return (
-      <Box sx={{ maxWidth: 1600, width: '100%', mx: 'auto' }}>
+      <Box sx={{ maxWidth: 1600, width: '100%' }}>
         <Button startIcon={<BackIcon />} onClick={() => navigate(`/clients/${clientId}`)} sx={{ mb: 2 }}>
           Back to client
         </Button>
@@ -729,7 +745,7 @@ export function ProjectDetailPage() {
     phases.find((p) => p.id === phaseId)?.activities ?? [];
 
   return (
-    <Box sx={{ maxWidth: 1600, width: '100%', mx: 'auto' }}>
+    <Box sx={{ maxWidth: 1600, width: '100%' }}>
       <Button startIcon={<BackIcon />} onClick={() => navigate(`/clients/${clientId}`)} sx={{ mb: 2 }}>
         Back to client
       </Button>
@@ -805,6 +821,37 @@ export function ProjectDetailPage() {
         </DialogActions>
       </Dialog>
 
+      <Dialog
+        open={!!activityToEdit}
+        onClose={() => !updateActivityMutation.isPending && setActivityToEdit(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Edit activity</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Activity name"
+            value={activityToEdit?.name ?? ''}
+            onChange={(e) => setActivityToEdit((a) => (a ? { ...a, name: e.target.value } : null))}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setActivityToEdit(null)} disabled={updateActivityMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => activityToEdit && updateActivityMutation.mutate({ id: activityToEdit.id, name: activityToEdit.name })}
+            disabled={!activityToEdit?.name.trim() || updateActivityMutation.isPending}
+          >
+            {updateActivityMutation.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 2, mb: 3, maxWidth: 1600 }}>
         <Card>
           <CardContent>
@@ -846,7 +893,7 @@ export function ProjectDetailPage() {
             px: 2,
             pt: 1.5,
             pb: 0,
-            '& .MuiTab-root': { textTransform: 'none' },
+            '& .MuiTab-root': { textTransform: 'none', fontWeight: 700 },
           }}
         >
           <Tab label="Project Activities" id="detail-tab-0" aria-controls="detail-tabpanel-0" />
@@ -902,6 +949,7 @@ export function ProjectDetailPage() {
                     editingHours={editingHours}
                     setEditingHours={setEditingHours}
                     onUpdateHours={(id, hours) => updateAssignmentMutation.mutate({ id, hours })}
+                    onEditActivity={(row) => setActivityToEdit({ id: row.activityId, name: row.activityName })}
                     onDuplicate={handleDuplicateRow}
                     onDelete={(id) => deleteAssignmentMutation.mutate(id)}
                   />
@@ -1012,19 +1060,16 @@ export function ProjectDetailPage() {
                     )}
                     disabled={!selectedPhaseId && !newRow.phaseNameNew.trim()}
                   />
-                  <Select
+                  <Autocomplete
                     size="small"
-                    displayEmpty
-                    value={newRow.consultantId}
-                    onChange={(e) => setNewRow((r) => ({ ...r, consultantId: e.target.value }))}
-                    renderValue={(v) => consultants.find((c) => c.id === v)?.name ?? 'Consultant'}
-                    sx={{ minWidth: 200 }}
-                  >
-                    <MenuItem value="">—</MenuItem>
-                    {consultants.map((c) => (
-                      <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-                    ))}
-                  </Select>
+                    options={consultants}
+                    getOptionLabel={(c) => c.name}
+                    value={consultants.find((c) => c.id === newRow.consultantId) ?? null}
+                    onChange={(_, value) => setNewRow((r) => ({ ...r, consultantId: value?.id ?? '' }))}
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="Consultant (type to search)" size="small" sx={{ minWidth: 200 }} />
+                    )}
+                  />
                   <TextField
                     type="number"
                     size="small"

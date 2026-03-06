@@ -168,20 +168,15 @@ export function ClientDetailPage() {
   const { client, projects } = data;
 
   return (
-    <Box sx={{ maxWidth: 1600, width: '100%', mx: 'auto' }}>
+    <Box sx={{ maxWidth: 1600, width: '100%' }}>
       <Button startIcon={<BackIcon />} onClick={() => navigate('/')} sx={{ mb: 2 }}>
         Back to clients
       </Button>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-        <div>
-          <Typography variant="h4" fontWeight={600}>
-            {client.name}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Projects
-          </Typography>
-        </div>
+        <Typography variant="h4" fontWeight={600}>
+          {client.name}
+        </Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
@@ -191,9 +186,6 @@ export function ClientDetailPage() {
         </Button>
       </Box>
 
-      <Typography variant="h6" sx={{ mb: 1 }}>
-        Projects
-      </Typography>
       {projects.length === 0 ? (
         <Card>
           <CardContent>
