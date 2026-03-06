@@ -177,7 +177,7 @@ function flattenProjectToRows(project: { phases?: PhaseWithActivitiesDisplay[] }
         }
     }
   }
-  return rows.sort((a, b) => a.sortOrder - b.sortOrder);
+  return rows;
 }
 
 function SortableActivityRow({
@@ -313,6 +313,7 @@ export function ProjectDetailPage() {
     hours: number;
   } | null>(null);
   const [addRowError, setAddRowError] = useState<string | null>(null);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [rateOverrideInputs, setRateOverrideInputs] = useState<Record<string, string>>({});
   const [savingOverrides, setSavingOverrides] = useState(false);
   const [detailTab, setDetailTab] = useState(0);
@@ -515,7 +516,20 @@ export function ProjectDetailPage() {
       });
       if (error) throw error;
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setDuplicateError(null);
+      invalidate();
+    },
+    onError: (err: Error) => {
+      const msg = err?.message ?? String(err);
+      if ((msg.includes('null value') && msg.includes('consultant_id')) || msg.includes('violates not-null')) {
+        setDuplicateError('Duplicate failed: database needs the migration that allows blank consultant. Run migration 003_activity_assignments_optional_consultant.sql in Supabase.');
+      } else if (msg.includes('column') && msg.includes('sort_order')) {
+        setDuplicateError('Duplicate failed: database needs the migration that adds sort_order. Run migration 002_activity_assignments_sort_order.sql in Supabase.');
+      } else {
+        setDuplicateError(msg || 'Duplicate failed.');
+      }
+    },
   });
 
   const reorderAssignmentsMutation = useMutation({
@@ -661,6 +675,7 @@ export function ProjectDetailPage() {
 
   const handleDuplicateRow = (row: FlatRow) => {
     if (!row.assignmentId) return;
+    setDuplicateError(null);
     duplicateAssignmentMutation.mutate({
       activity_id: row.activityId,
       hours: row.hours,
@@ -839,7 +854,7 @@ export function ProjectDetailPage() {
         aria-labelledby="delete-project-dialog-title"
       >
         <DialogTitle id="delete-project-dialog-title">Delete project?</DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pt: 4 }}>
           <DialogContentText>
             This will permanently delete the project &quot;{projectData.name}&quot; and all its phases, activities and assignments. This cannot be undone.
           </DialogContentText>
@@ -866,7 +881,7 @@ export function ProjectDetailPage() {
         fullWidth
       >
         <DialogTitle>Edit row</DialogTitle>
-        <DialogContent sx={{ pt: 0, '& .MuiFormControl-root': { marginBottom: 4 } }}>
+        <DialogContent sx={{ pt: 4, '& .MuiFormControl-root': { marginBottom: 4 } }}>
           <Autocomplete
             size="small"
             options={phases}
@@ -1056,6 +1071,15 @@ export function ProjectDetailPage() {
                   <TableCell colSpan={8} sx={{ py: 1, verticalAlign: 'middle' }}>
                     <Alert severity="error" onClose={() => setAddRowError(null)}>
                       {addRowError}
+                    </Alert>
+                  </TableCell>
+                </TableRow>
+              )}
+              {duplicateError && (
+                <TableRow>
+                  <TableCell colSpan={8} sx={{ py: 1, verticalAlign: 'middle' }}>
+                    <Alert severity="error" onClose={() => setDuplicateError(null)}>
+                      {duplicateError}
                     </Alert>
                   </TableCell>
                 </TableRow>

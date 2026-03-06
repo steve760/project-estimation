@@ -291,7 +291,7 @@ export function ClientsPage() {
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editingId ? 'Edit client' : 'New client'}</DialogTitle>
         <form onSubmit={handleSubmit(onSubmit)}>
-          <DialogContent>
+          <DialogContent sx={{ pt: 4 }}>
             <TextField
               {...register('name')}
               label="Client name"

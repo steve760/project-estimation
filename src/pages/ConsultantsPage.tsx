@@ -273,7 +273,7 @@ export function ConsultantsPage() {
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editingId ? 'Edit consultant' : 'New consultant'}</DialogTitle>
         <form onSubmit={handleSubmit(onSubmit)}>
-          <DialogContent sx={{ pt: 0, '& .MuiFormControl-root': { marginBottom: 4 } }}>
+          <DialogContent sx={{ pt: 4, '& .MuiFormControl-root': { marginBottom: 4 } }}>
             {editingId && (
               <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Avatar

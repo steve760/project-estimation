@@ -278,7 +278,7 @@ export function ClientDetailPage() {
       <Dialog open={newProjectModalOpen} onClose={() => setNewProjectModalOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>New project</DialogTitle>
         <form onSubmit={handleSubmit((d) => createProjectMutation.mutate(d.name))}>
-          <DialogContent>
+          <DialogContent sx={{ pt: 4 }}>
             <TextField
               {...register('name')}
               label="Project name"
