@@ -221,6 +221,8 @@ export function ClientsPage() {
       headerName: 'Average GP %',
       width: 120,
       type: 'number',
+      align: 'left',
+      headerAlign: 'left',
       valueGetter: (_, row) => row.averageGpPercent,
       renderCell: ({ row }) => {
         const value = row.averageGpPercent;
