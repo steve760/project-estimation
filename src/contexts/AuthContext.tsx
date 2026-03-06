@@ -21,11 +21,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     const timeout = window.setTimeout(() => {
-      if (cancelled) return;
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }, 5000);
 
-    supabase.auth.getSession()
+    supabase.auth
+      .getSession()
       .then(({ data: { session } }) => {
         if (!cancelled) {
           setSession(session);
@@ -33,7 +33,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => {
-        if (!cancelled) setUser(null);
+        if (!cancelled) {
+          setSession(null);
+          setUser(null);
+        }
       })
       .finally(() => {
         if (!cancelled) {
@@ -45,9 +48,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      if (!cancelled) {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
     });
 
     return () => {
