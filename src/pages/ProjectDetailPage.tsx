@@ -27,6 +27,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Tooltip,
 } from '@mui/material';
 import { ArrowBack as BackIcon, Delete as DeleteIcon, Save as SaveIcon, ContentCopy as CopyIcon, DragIndicator as DragIcon, Settings as SettingsIcon, Edit as EditIcon } from '@mui/icons-material';
 import {
@@ -854,7 +855,7 @@ export function ProjectDetailPage() {
         fullWidth
       >
         <DialogTitle>Edit row</DialogTitle>
-        <DialogContent sx={{ pt: 0, '& .MuiFormControl-root': { marginBottom: 2 } }}>
+        <DialogContent sx={{ pt: 0, '& .MuiFormControl-root': { marginBottom: 4 } }}>
           <Autocomplete
             size="small"
             options={phases}
@@ -965,14 +966,16 @@ export function ProjectDetailPage() {
             {detailTab === 0 && (
               <>
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<CopyIcon />}
-                    onClick={handleCopyTableToWord}
-                  >
-                    Copy
-                  </Button>
+                  <Tooltip title="Copy to clipboard to paste into proposal">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<CopyIcon />}
+                      onClick={handleCopyTableToWord}
+                    >
+                      Copy
+                    </Button>
+                  </Tooltip>
                 </Box>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <Table size="small" sx={{ '& .MuiTableCell-root': { verticalAlign: 'middle' } }}>

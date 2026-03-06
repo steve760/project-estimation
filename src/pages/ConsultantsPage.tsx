@@ -12,6 +12,7 @@ import {
   DialogActions,
   TextField,
   Avatar,
+  Checkbox,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
@@ -50,17 +51,22 @@ type ConsultantForm = {
   name: string;
   cost_per_hour: number;
   charge_out_rate: number;
+  inactive?: boolean;
 };
 
 async function fetchConsultants() {
-  const { data, error } = await supabase.from('consultants').select('*').order('name');
+  const { data, error } = await supabase
+    .from('consultants')
+    .select('*')
+    .order('inactive', { ascending: true })
+    .order('name', { ascending: true });
   if (error) throw error;
   return (data ?? []) as Consultant[];
 }
 
 async function createConsultant(input: ConsultantForm & { color?: string }) {
   const { color, ...rest } = input;
-  const payload: Record<string, unknown> = { ...rest };
+  const payload: Record<string, unknown> = { ...rest, inactive: rest.inactive ?? false };
   if (color) payload.color = color;
   const { data, error } = await supabase
     .from('consultants')
@@ -71,13 +77,14 @@ async function createConsultant(input: ConsultantForm & { color?: string }) {
   return data as Consultant;
 }
 
-async function updateConsultant(id: string, input: ConsultantForm) {
+async function updateConsultant(id: string, input: ConsultantForm & { inactive?: boolean }) {
   const { data, error } = await supabase
     .from('consultants')
     .update({
       name: input.name,
       cost_per_hour: input.cost_per_hour,
       charge_out_rate: input.charge_out_rate,
+      ...(input.inactive !== undefined && { inactive: input.inactive }),
     })
     .eq('id', id)
     .select()
@@ -106,7 +113,7 @@ export function ConsultantsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: ConsultantForm }) => updateConsultant(id, input),
+    mutationFn: ({ id, input }: { id: string; input: ConsultantForm & { inactive?: boolean } }) => updateConsultant(id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultants'] });
       setModalOpen(false);
@@ -120,15 +127,16 @@ export function ConsultantsPage() {
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<ConsultantForm>({
     resolver: zodResolver(consultantSchema) as import('react-hook-form').Resolver<ConsultantForm>,
-    defaultValues: { name: '', cost_per_hour: 0, charge_out_rate: 0 },
+    defaultValues: { name: '', cost_per_hour: 0, charge_out_rate: 0, inactive: false },
   });
 
   const openCreate = () => {
     setEditingId(null);
-    reset({ name: '', cost_per_hour: 0, charge_out_rate: 0 });
+    reset({ name: '', cost_per_hour: 0, charge_out_rate: 0, inactive: false });
     setModalOpen(true);
   };
 
@@ -137,18 +145,45 @@ export function ConsultantsPage() {
     setValue('name', row.name);
     setValue('cost_per_hour', row.cost_per_hour);
     setValue('charge_out_rate', row.charge_out_rate);
+    setValue('inactive', !!row.inactive);
     setModalOpen(true);
   };
 
   const onSubmit = (data: ConsultantForm) => {
-    if (editingId) updateMutation.mutate({ id: editingId, input: data });
+    if (editingId) updateMutation.mutate({ id: editingId, input: { ...data, inactive: data.inactive } });
     else {
       const color = CONSULTANT_COLORS[consultants.length % CONSULTANT_COLORS.length];
-      createMutation.mutate({ ...data, color });
+      createMutation.mutate({ ...data, color, inactive: false });
     }
   };
 
   const columns: GridColDef<Consultant>[] = [
+    {
+      field: 'inactive',
+      headerName: 'Active',
+      width: 80,
+      sortable: false,
+      renderCell: ({ row }) => (
+        <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', alignItems: 'center' }}>
+          <Checkbox
+            checked={!row.inactive}
+            onChange={() => {
+              updateMutation.mutate({
+                id: row.id,
+                input: {
+                  name: row.name,
+                  cost_per_hour: row.cost_per_hour,
+                  charge_out_rate: row.charge_out_rate,
+                  inactive: !row.inactive,
+                },
+              });
+            }}
+            disabled={updateMutation.isPending}
+            size="small"
+          />
+        </Box>
+      ),
+    },
     {
       field: 'name',
       headerName: 'Name',
@@ -238,9 +273,9 @@ export function ConsultantsPage() {
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>{editingId ? 'Edit consultant' : 'New consultant'}</DialogTitle>
         <form onSubmit={handleSubmit(onSubmit)}>
-          <DialogContent>
+          <DialogContent sx={{ pt: 0, '& .MuiFormControl-root': { marginBottom: 4 } }}>
             {editingId && (
-              <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Avatar
                   sx={{
                     width: 64,
@@ -258,7 +293,6 @@ export function ConsultantsPage() {
               fullWidth
               error={!!errors.name}
               helperText={errors.name?.message}
-              sx={{ mb: 2 }}
               autoFocus
             />
             <TextField
@@ -269,7 +303,6 @@ export function ConsultantsPage() {
               fullWidth
               error={!!errors.cost_per_hour}
               helperText={errors.cost_per_hour?.message}
-              sx={{ mb: 2 }}
             />
             <TextField
               {...register('charge_out_rate')}
@@ -280,6 +313,15 @@ export function ConsultantsPage() {
               error={!!errors.charge_out_rate}
               helperText={errors.charge_out_rate?.message}
             />
+            {editingId && (
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Checkbox
+                  checked={!!watch('inactive')}
+                  onChange={(e) => setValue('inactive', e.target.checked)}
+                />
+                <Typography variant="body2">Inactive</Typography>
+              </Box>
+            )}
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
             <Button onClick={() => setModalOpen(false)}>Cancel</Button>

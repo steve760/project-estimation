@@ -22,6 +22,66 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import type { Client } from '../types/database';
+import type { Consultant } from '../types/database';
+import { computeFinancialSummary } from '../lib/calculations';
+
+async function fetchClientAverageGp(clientIds: string[]): Promise<Record<string, number>> {
+  if (clientIds.length === 0) return {};
+  const { data: projects } = await supabase.from('projects').select('id, client_id').in('client_id', clientIds);
+  const projectList = projects ?? [];
+  if (projectList.length === 0) return {};
+  const projectIds = projectList.map((p) => p.id);
+  const { data: phases } = await supabase.from('phases').select('id, project_id').in('project_id', projectIds);
+  const phasesList = phases ?? [];
+  const phaseIds = phasesList.map((p) => p.id);
+  if (phaseIds.length === 0) return {};
+  const { data: activities } = await supabase.from('activities').select('id, phase_id').in('phase_id', phaseIds);
+  const activitiesList = activities ?? [];
+  const activityIds = activitiesList.map((a) => a.id);
+  if (activityIds.length === 0) return {};
+  const [assignmentsRes, consultantIdsRes] = await Promise.all([
+    supabase.from('activity_assignments').select('*').in('activity_id', activityIds),
+    supabase.from('activity_assignments').select('consultant_id').in('activity_id', activityIds),
+  ]);
+  const assignmentsList = (assignmentsRes.data ?? []) as { id: string; activity_id: string; consultant_id: string | null; hours: number }[];
+  const cIds = [...new Set((consultantIdsRes.data ?? []).map((a: { consultant_id: string | null }) => a.consultant_id).filter(Boolean))] as string[];
+  const { data: consultantsList } = cIds.length ? await supabase.from('consultants').select('*').in('id', cIds) : { data: [] };
+  const consultantMap = new Map(((consultantsList ?? []) as Consultant[]).map((c) => [c.id, c]));
+  const activityToPhase = new Map<string, string>();
+  for (const a of activitiesList) activityToPhase.set(a.id, a.phase_id);
+  const phaseToProject = new Map<string, string>();
+  for (const p of phasesList) phaseToProject.set(p.id, p.project_id);
+  const projectToClient = new Map<string, string>();
+  for (const p of projectList) projectToClient.set(p.id, p.client_id);
+  const projectAssignments = new Map<string, { hours: number; consultant: Consultant }[]>();
+  for (const a of assignmentsList) {
+    if (!a.consultant_id) continue;
+    const consultant = consultantMap.get(a.consultant_id);
+    if (!consultant) continue;
+    const phaseId = activityToPhase.get(a.activity_id);
+    const projectId = phaseId ? phaseToProject.get(phaseId) : undefined;
+    if (!projectId) continue;
+    const list = projectAssignments.get(projectId) ?? [];
+    list.push({ hours: a.hours, consultant });
+    projectAssignments.set(projectId, list);
+  }
+  const clientMargins = new Map<string, number[]>();
+  for (const proj of projectList) {
+    const assignments = projectAssignments.get(proj.id) ?? [];
+    const summary = computeFinancialSummary(assignments);
+    const clientId = proj.client_id;
+    const list = clientMargins.get(clientId) ?? [];
+    list.push(summary.marginPercent);
+    clientMargins.set(clientId, list);
+  }
+  const result: Record<string, number> = {};
+  for (const clientId of clientIds) {
+    const margins = clientMargins.get(clientId) ?? [];
+    if (margins.length === 0) continue;
+    result[clientId] = margins.reduce((a, b) => a + b, 0) / margins.length;
+  }
+  return result;
+}
 
 function getInitials(name: string): string {
   return name
@@ -39,14 +99,19 @@ const clientSchema = z.object({
 
 type ClientForm = z.infer<typeof clientSchema>;
 
+const CLIENT_COLORS = [
+  '#6D5CBE', '#B69AF2', '#10b981', '#ef4444', '#f59e0b',
+  '#3b82f6', '#ec4899', '#14b8a6', '#8b5cf6', '#f97316',
+];
+
 async function fetchClients() {
   const { data, error } = await supabase.from('clients').select('*').order('name');
   if (error) throw error;
   return (data ?? []) as Client[];
 }
 
-async function createClient(input: ClientForm) {
-  const { data, error } = await supabase.from('clients').insert({ name: input.name }).select().single();
+async function createClient(input: ClientForm & { color?: string }) {
+  const { data, error } = await supabase.from('clients').insert({ name: input.name, color: input.color ?? null }).select().single();
   if (error) throw error;
   return data as Client;
 }
@@ -73,6 +138,15 @@ export function ClientsPage() {
     queryKey: ['clients'],
     queryFn: fetchClients,
   });
+
+  const clientIds = clients.map((c) => c.id);
+  const { data: averageGpByClient = {} } = useQuery({
+    queryKey: ['clients', 'average-gp', clientIds],
+    queryFn: () => fetchClientAverageGp(clientIds),
+    enabled: clientIds.length > 0,
+  });
+
+  const rows = clients.map((c) => ({ ...c, averageGpPercent: averageGpByClient[c.id] }));
 
   const createMutation = useMutation({
     mutationFn: createClient,
@@ -119,10 +193,13 @@ export function ClientsPage() {
 
   const onSubmit = (data: ClientForm) => {
     if (editingId) updateMutation.mutate({ id: editingId, input: data });
-    else createMutation.mutate(data);
+    else {
+      const color = CLIENT_COLORS[clients.length % CLIENT_COLORS.length];
+      createMutation.mutate({ ...data, color });
+    }
   };
 
-  const columns: GridColDef<Client>[] = [
+  const columns: GridColDef<Client & { averageGpPercent?: number }>[] = [
     {
       field: 'name',
       headerName: 'Client name',
@@ -130,7 +207,7 @@ export function ClientsPage() {
       minWidth: 200,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar sx={{ width: 32, height: 32 }}>
+          <Avatar sx={{ width: 32, height: 32, bgcolor: row.color ?? 'primary.main' }}>
             {getInitials(row.name)}
           </Avatar>
           <Typography variant="body2" fontWeight={400}>
@@ -138,6 +215,22 @@ export function ClientsPage() {
           </Typography>
         </Box>
       ),
+    },
+    {
+      field: 'averageGpPercent',
+      headerName: 'Average GP %',
+      width: 120,
+      type: 'number',
+      valueGetter: (_, row) => row.averageGpPercent,
+      renderCell: ({ row }) => {
+        const value = row.averageGpPercent;
+        if (value == null) return <Typography variant="body2" color="text.secondary">—</Typography>;
+        return (
+          <Typography variant="body2" fontWeight={500} color={value >= 0 ? 'success.main' : 'error.main'}>
+            {value.toFixed(1)}%
+          </Typography>
+        );
+      },
     },
     {
       field: 'actions',
@@ -173,7 +266,7 @@ export function ClientsPage() {
 
       <Card>
         <DataGrid
-          rows={clients}
+          rows={rows}
           columns={columns}
           getRowId={(r) => r.id}
           loading={isLoading}

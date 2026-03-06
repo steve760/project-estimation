@@ -13,6 +13,7 @@ export interface Consultant {
   charge_out_rate: number;
   avatar_url?: string | null;
   color?: string | null;
+  inactive?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -20,6 +21,7 @@ export interface Consultant {
 export interface Client {
   id: string;
   name: string;
+  color?: string | null;
   created_at: string;
   updated_at: string;
 }
