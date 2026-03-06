@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Box, Button, Card, CardContent, TextField, Typography } from '@mui/material';
-import { ArrowBack as BackIcon } from '@mui/icons-material';
 import { supabase } from '../lib/supabase';
 
 const schema = z.object({ name: z.string().min(1, 'Name is required') });
@@ -44,9 +43,6 @@ export function NewProjectPage() {
 
   return (
     <Box>
-      <Button startIcon={<BackIcon />} onClick={() => navigate(`/clients/${clientId}`)} sx={{ mb: 2 }}>
-        Back
-      </Button>
       <Card sx={{ maxWidth: 480 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>New project</Typography>

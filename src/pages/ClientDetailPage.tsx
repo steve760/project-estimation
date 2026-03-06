@@ -18,8 +18,9 @@ import {
   DialogActions,
   TextField,
 } from '@mui/material';
-import { ArrowBack as BackIcon, Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon } from '@mui/icons-material';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type {
   Client,
   Project,
@@ -120,6 +121,7 @@ export function ClientDetailPage() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAdmin, consultantId } = useAuth();
   const [newProjectModalOpen, setNewProjectModalOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -131,9 +133,14 @@ export function ClientDetailPage() {
   const createProjectMutation = useMutation({
     mutationFn: async (name: string) => {
       if (!clientId) throw new Error('No client');
+      const nameTrim = name.trim();
+      const { data: existing } = await supabase.from('projects').select('id, name').eq('client_id', clientId);
+      if ((existing ?? []).some((p) => p.name.trim().toLowerCase() === nameTrim.toLowerCase())) {
+        throw new Error('This client already has a project with this name.');
+      }
       const { data, error } = await supabase
         .from('projects')
-        .insert({ client_id: clientId, name })
+        .insert({ client_id: clientId, name: nameTrim, status: 'proposal' })
         .select()
         .single();
       if (error) throw error;
@@ -167,12 +174,21 @@ export function ClientDetailPage() {
 
   const { client, projects } = data;
 
+  const visibleProjects = isAdmin || !consultantId
+    ? projects
+    : projects.filter((p) => {
+        for (const phase of p.phases ?? []) {
+          for (const activity of phase.activities ?? []) {
+            for (const a of activity.assignments ?? []) {
+              if (a.consultant_id === consultantId) return true;
+            }
+          }
+        }
+        return false;
+      });
+
   return (
     <Box sx={{ maxWidth: 1600, width: '100%' }}>
-      <Button startIcon={<BackIcon />} onClick={() => navigate('/')} sx={{ mb: 2 }}>
-        Back to clients
-      </Button>
-
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
         <Typography variant="h4" fontWeight={600}>
           {client.name}
@@ -186,14 +202,16 @@ export function ClientDetailPage() {
         </Button>
       </Box>
 
-      {projects.length === 0 ? (
+      {visibleProjects.length === 0 ? (
         <Card>
           <CardContent>
-            <Typography color="text.secondary">No projects yet. Add a project to get started.</Typography>
+            <Typography color="text.secondary">
+              {isAdmin ? 'No projects yet. Add a project to get started.' : 'You are not assigned to any projects for this client.'}
+            </Typography>
           </CardContent>
         </Card>
       ) : (
-        projects.map((project) => {
+        visibleProjects.map((project) => {
           const projectAssignments: { hours: number; consultant: Consultant }[] = [];
           for (const phase of project.phases ?? []) {
             for (const activity of phase.activities ?? []) {
@@ -222,34 +240,59 @@ export function ClientDetailPage() {
               onClick={() => navigate(`/clients/${clientId}/projects/${project.id}`)}
             >
               <CardContent>
-                <Typography variant="h6" fontWeight={600}>
-                  {project.name}
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 3, mt: 1.5, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">Revenue</Typography>
-                    <Typography variant="body1" fontWeight={600}>
-                      ${roundCurrency(summary.revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">Cost</Typography>
-                    <Typography variant="body1" fontWeight={600}>
-                      ${roundCurrency(summary.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">Gross profit</Typography>
-                    <Typography variant="body1" fontWeight={600} color={grossProfit >= 0 ? 'success.main' : 'error.main'}>
-                      ${roundCurrency(grossProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="caption" color="text.secondary">GP %</Typography>
-                    <Typography variant="body1" fontWeight={600} color={marginPercent >= 0 ? 'success.main' : 'error.main'}>
-                      {marginPercent.toFixed(1)}%
-                    </Typography>
-                  </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <Typography variant="h6" fontWeight={600}>
+                    {project.name}
+                  </Typography>
+                  <Chip size="small" label={project.status === 'active' ? 'Active' : 'Proposal'} color={project.status === 'active' ? 'success' : 'default'} />
+                  {project.non_billable && (
+                    <Chip size="small" label="Non-billable" variant="outlined" />
+                  )}
+                </Box>
+                <Box sx={{ display: 'flex', gap: 3, mt: 1.5, flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'flex-start' }}>
+                  {project.status === 'active' ? (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/reporting/project/${project.id}`);
+                      }}
+                    >
+                      View project report
+                    </Button>
+                  ) : (
+                    <>
+                      <Box sx={{ textAlign: 'left' }}>
+                        <Typography variant="caption" color="text.secondary">Estimated cost</Typography>
+                        <Typography variant="body1" fontWeight={600}>
+                          ${roundCurrency(summary.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </Typography>
+                      </Box>
+                      {!project.non_billable && (
+                        <>
+                          <Box sx={{ textAlign: 'left' }}>
+                            <Typography variant="caption" color="text.secondary">Estimated revenue</Typography>
+                            <Typography variant="body1" fontWeight={600}>
+                              ${roundCurrency(summary.revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ textAlign: 'left' }}>
+                            <Typography variant="caption" color="text.secondary">Estimated gross profit</Typography>
+                            <Typography variant="body1" fontWeight={600} color={grossProfit >= 0 ? 'success.main' : 'error.main'}>
+                              ${roundCurrency(grossProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ textAlign: 'left' }}>
+                            <Typography variant="caption" color="text.secondary">Estimated GP %</Typography>
+                            <Typography variant="body1" fontWeight={600} color={marginPercent >= 0 ? 'success.main' : 'error.main'}>
+                              {marginPercent.toFixed(1)}%
+                            </Typography>
+                          </Box>
+                        </>
+                      )}
+                    </>
+                  )}
                   {uniqueConsultants.length > 0 && (
                     <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', ml: 'auto', alignItems: 'flex-end' }}>
                       {uniqueConsultants.map((c) => (
@@ -283,8 +326,8 @@ export function ClientDetailPage() {
               {...register('name')}
               label="Project name"
               fullWidth
-              error={!!errors.name}
-              helperText={errors.name?.message}
+              error={!!errors.name || !!createProjectMutation.error}
+              helperText={errors.name?.message ?? (createProjectMutation.error as Error)?.message}
               autoFocus
             />
           </DialogContent>

@@ -21,6 +21,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { Client } from '../types/database';
 import type { Consultant } from '../types/database';
 import { computeFinancialSummary } from '../lib/calculations';
@@ -111,13 +112,23 @@ async function fetchClients() {
 }
 
 async function createClient(input: ClientForm & { color?: string }) {
-  const { data, error } = await supabase.from('clients').insert({ name: input.name, color: input.color ?? null }).select().single();
+  const nameTrim = input.name.trim();
+  const { data: existing } = await supabase.from('clients').select('id, name');
+  if ((existing ?? []).some((c) => c.name.trim().toLowerCase() === nameTrim.toLowerCase())) {
+    throw new Error('A client with this name already exists.');
+  }
+  const { data, error } = await supabase.from('clients').insert({ name: nameTrim, color: input.color ?? null }).select().single();
   if (error) throw error;
   return data as Client;
 }
 
 async function updateClient(id: string, input: ClientForm) {
-  const { data, error } = await supabase.from('clients').update({ name: input.name }).eq('id', id).select().single();
+  const nameTrim = input.name.trim();
+  const { data: existing } = await supabase.from('clients').select('id, name');
+  if ((existing ?? []).some((c) => c.id !== id && c.name.trim().toLowerCase() === nameTrim.toLowerCase())) {
+    throw new Error('A client with this name already exists.');
+  }
+  const { data, error } = await supabase.from('clients').update({ name: nameTrim }).eq('id', id).select().single();
   if (error) throw error;
   return data as Client;
 }
@@ -130,6 +141,7 @@ async function deleteClient(id: string) {
 export function ClientsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
@@ -216,24 +228,28 @@ export function ClientsPage() {
         </Box>
       ),
     },
-    {
-      field: 'averageGpPercent',
-      headerName: 'Average GP %',
-      width: 120,
-      type: 'number',
-      align: 'left',
-      headerAlign: 'left',
-      valueGetter: (_, row) => row.averageGpPercent,
-      renderCell: ({ row }) => {
-        const value = row.averageGpPercent;
-        if (value == null) return <Typography variant="body2" color="text.secondary">—</Typography>;
-        return (
-          <Typography variant="body2" fontWeight={500} color={value >= 0 ? 'success.main' : 'error.main'}>
-            {value.toFixed(1)}%
-          </Typography>
-        );
-      },
-    },
+    ...(isAdmin
+      ? [
+          {
+            field: 'averageGpPercent',
+            headerName: 'Average GP %',
+            width: 120,
+            type: 'number' as const,
+            align: 'left' as const,
+            headerAlign: 'left' as const,
+            valueGetter: (_: unknown, row: Client & { averageGpPercent?: number }) => row.averageGpPercent,
+            renderCell: ({ row }: { row: Client & { averageGpPercent?: number } }) => {
+              const value = row.averageGpPercent;
+              if (value == null) return <Typography variant="body2" color="text.secondary">—</Typography>;
+              return (
+                <Typography variant="body2" fontWeight={500} color={value >= 0 ? 'success.main' : 'error.main'}>
+                  {value.toFixed(1)}%
+                </Typography>
+              );
+            },
+          },
+        ]
+      : []),
     {
       field: 'actions',
       headerName: '',
@@ -255,7 +271,7 @@ export function ClientsPage() {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <div>
           <Typography variant="h4" fontWeight={600}>
-            Clients
+            Projects
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Manage clients and their projects
@@ -296,8 +312,8 @@ export function ClientsPage() {
               {...register('name')}
               label="Client name"
               fullWidth
-              error={!!errors.name}
-              helperText={errors.name?.message}
+              error={!!errors.name || !!createMutation.error || !!updateMutation.error}
+              helperText={errors.name?.message ?? (createMutation.error as Error)?.message ?? (updateMutation.error as Error)?.message}
               autoFocus
             />
           </DialogContent>

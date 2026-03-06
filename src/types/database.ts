@@ -14,6 +14,10 @@ export interface Consultant {
   avatar_url?: string | null;
   color?: string | null;
   inactive?: boolean;
+  /** Auth: links to Supabase auth.users when this consultant can log in */
+  user_id?: string | null;
+  /** Auth: admin or user; only present when consultant is linked to a user */
+  role?: 'admin' | 'user' | null;
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +34,8 @@ export interface Project {
   id: string;
   client_id: string;
   name: string;
+  status?: 'proposal' | 'active';
+  non_billable?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -97,6 +103,23 @@ export interface ProjectConsultantRate {
   charge_out_rate: number;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface Profile {
+  id: string;
+  role: 'admin' | 'user';
+  consultant_id: string | null;
+}
+
+export interface TimeEntry {
+  id: string;
+  consultant_id: string;
+  project_id: string;
+  activity_id: string;
+  entry_date: string;
+  hours: number;
+  notes: string | null;
+  created_at: string;
 }
 
 // Phase/Activity with nested assignments (for project detail views)

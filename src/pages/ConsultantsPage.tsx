@@ -13,6 +13,10 @@ import {
   TextField,
   Avatar,
   Checkbox,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
@@ -20,6 +24,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { Consultant } from '../types/database';
 
 function getInitials(name: string): string {
@@ -52,6 +57,7 @@ type ConsultantForm = {
   cost_per_hour: number;
   charge_out_rate: number;
   inactive?: boolean;
+  role?: 'admin' | 'user';
 };
 
 async function fetchConsultants() {
@@ -61,12 +67,38 @@ async function fetchConsultants() {
     .order('inactive', { ascending: true })
     .order('name', { ascending: true });
   if (error) throw error;
-  return (data ?? []) as Consultant[];
+  const raw = (data ?? []) as Record<string, unknown>[];
+  return raw.map((row) => normalizeConsultantRow(row)) as Consultant[];
+}
+
+function normalizeConsultantRow(row: Record<string, unknown>): Consultant {
+  const num = (v: unknown): number => {
+    if (v == null || v === '') return 0;
+    const n = Number(v);
+    return Number.isNaN(n) ? 0 : n;
+  };
+  return {
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    cost_per_hour: num(row.cost_per_hour),
+    charge_out_rate: num(row.charge_out_rate),
+    avatar_url: row.avatar_url != null ? String(row.avatar_url) : null,
+    color: row.color != null ? String(row.color) : null,
+    inactive: Boolean(row.inactive),
+    user_id: row.user_id != null ? String(row.user_id) : null,
+    role: row.role === 'admin' ? 'admin' : 'user',
+    created_at: String(row.created_at ?? ''),
+    updated_at: String(row.updated_at ?? ''),
+  };
 }
 
 async function createConsultant(input: ConsultantForm & { color?: string }) {
   const { color, ...rest } = input;
-  const payload: Record<string, unknown> = { ...rest, inactive: rest.inactive ?? false };
+  const payload: Record<string, unknown> = {
+    ...rest,
+    inactive: rest.inactive ?? false,
+    role: rest.role ?? 'user',
+  };
   if (color) payload.color = color;
   const { data, error } = await supabase
     .from('consultants')
@@ -77,15 +109,17 @@ async function createConsultant(input: ConsultantForm & { color?: string }) {
   return data as Consultant;
 }
 
-async function updateConsultant(id: string, input: ConsultantForm & { inactive?: boolean }) {
+async function updateConsultant(id: string, input: ConsultantForm & { inactive?: boolean; role?: 'admin' | 'user' }) {
+  const payload: Record<string, unknown> = {
+    name: input.name,
+    cost_per_hour: input.cost_per_hour,
+    charge_out_rate: input.charge_out_rate,
+    ...(input.inactive !== undefined && { inactive: input.inactive }),
+    ...(input.role !== undefined && { role: input.role }),
+  };
   const { data, error } = await supabase
     .from('consultants')
-    .update({
-      name: input.name,
-      cost_per_hour: input.cost_per_hour,
-      charge_out_rate: input.charge_out_rate,
-      ...(input.inactive !== undefined && { inactive: input.inactive }),
-    })
+    .update(payload)
     .eq('id', id)
     .select()
     .single();
@@ -95,13 +129,16 @@ async function updateConsultant(id: string, input: ConsultantForm & { inactive?:
 
 export function ConsultantsPage() {
   const queryClient = useQueryClient();
+  const { isAdmin, profileLoading, user } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data: consultants = [], isLoading } = useQuery({
-    queryKey: ['consultants'],
+    queryKey: ['consultants', user?.id],
     queryFn: fetchConsultants,
   });
+
+  const showAdminColumns = !profileLoading && isAdmin;
 
   const createMutation = useMutation({
     mutationFn: createConsultant,
@@ -113,12 +150,52 @@ export function ConsultantsPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: ConsultantForm & { inactive?: boolean } }) => updateConsultant(id, input),
+    mutationFn: ({ id, input }: { id: string; input: ConsultantForm & { inactive?: boolean; role?: 'admin' | 'user' } }) => updateConsultant(id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultants'] });
       setModalOpen(false);
       setEditingId(null);
       reset();
+    },
+  });
+
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ id, role }: { id: string; role: 'admin' | 'user' }) => {
+      const { data, error } = await supabase
+        .from('consultants')
+        .update({ role, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as Consultant;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultants'] });
+    },
+  });
+
+  const { data: authUsers = [] } = useQuery({
+    queryKey: ['auth-users'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_auth_users');
+      if (error) throw error;
+      return (data ?? []) as { id: string; email: string | null }[];
+    },
+    enabled: showAdminColumns,
+  });
+
+  const linkUserMutation = useMutation({
+    mutationFn: async ({ consultantId, userId }: { consultantId: string; userId: string | null }) => {
+      const { error } = await supabase.rpc('link_consultant_to_user', {
+        p_consultant_id: consultantId,
+        p_user_id: userId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultants'] });
+      queryClient.invalidateQueries({ queryKey: ['auth-users'] });
     },
   });
 
@@ -131,12 +208,12 @@ export function ConsultantsPage() {
     formState: { errors },
   } = useForm<ConsultantForm>({
     resolver: zodResolver(consultantSchema) as import('react-hook-form').Resolver<ConsultantForm>,
-    defaultValues: { name: '', cost_per_hour: 0, charge_out_rate: 0, inactive: false },
+    defaultValues: { name: '', cost_per_hour: 0, charge_out_rate: 0, inactive: false, role: 'user' },
   });
 
   const openCreate = () => {
     setEditingId(null);
-    reset({ name: '', cost_per_hour: 0, charge_out_rate: 0, inactive: false });
+    reset({ name: '', cost_per_hour: 0, charge_out_rate: 0, inactive: false, role: 'user' });
     setModalOpen(true);
   };
 
@@ -146,14 +223,15 @@ export function ConsultantsPage() {
     setValue('cost_per_hour', row.cost_per_hour);
     setValue('charge_out_rate', row.charge_out_rate);
     setValue('inactive', !!row.inactive);
+    setValue('role', row.role ?? 'user');
     setModalOpen(true);
   };
 
   const onSubmit = (data: ConsultantForm) => {
-    if (editingId) updateMutation.mutate({ id: editingId, input: { ...data, inactive: data.inactive } });
+    if (editingId) updateMutation.mutate({ id: editingId, input: { ...data, inactive: data.inactive, role: data.role } });
     else {
       const color = CONSULTANT_COLORS[consultants.length % CONSULTANT_COLORS.length];
-      createMutation.mutate({ ...data, color, inactive: false });
+      createMutation.mutate({ ...data, color, inactive: false, role: data.role ?? 'user' });
     }
   };
 
@@ -204,20 +282,87 @@ export function ConsultantsPage() {
         </Box>
       ),
     },
-    {
-      field: 'cost_per_hour',
-      headerName: 'Cost/hour',
-      width: 120,
-      type: 'number',
-      valueFormatter: (v) => (v != null ? `$${Number(v).toFixed(2)}` : ''),
-    },
-    {
-      field: 'charge_out_rate',
-      headerName: 'Charge out/hour',
-      width: 140,
-      type: 'number',
-      valueFormatter: (v) => (v != null ? `$${Number(v).toFixed(2)}` : ''),
-    },
+    ...(showAdminColumns
+      ? [
+          {
+            field: 'role',
+            headerName: 'Role',
+            width: 120,
+            sortable: true,
+            align: 'center' as const,
+            headerAlign: 'center' as const,
+            valueGetter: (_value, row) => row.role ?? 'user',
+            renderCell: ({ row }: { row: Consultant }) => (
+              <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', alignItems: 'center', minHeight: 65, minWidth: 100 }}>
+                <FormControl size="small" fullWidth>
+                  <Select
+                    value={row.role ?? 'user'}
+                    onChange={(e) => {
+                      const v = e.target.value as 'admin' | 'user';
+                      updateRoleMutation.mutate({ id: row.id, role: v });
+                    }}
+                    disabled={updateRoleMutation.isPending}
+                    displayEmpty
+                    sx={{ height: 36, fontSize: '0.875rem' }}
+                  >
+                    <MenuItem value="user">User</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+            ),
+          },
+          {
+            field: 'cost_per_hour',
+            headerName: 'Cost/hour',
+            width: 120,
+            type: 'number' as const,
+            valueGetter: (value: unknown) => (value != null && value !== '' ? Number(value) : 0),
+            valueFormatter: (v: unknown) => (v != null && v !== '' ? `$${Number(v).toFixed(2)}` : '$0.00'),
+          },
+          {
+            field: 'charge_out_rate',
+            headerName: 'Charge out/hour',
+            width: 140,
+            type: 'number' as const,
+            valueGetter: (value: unknown) => (value != null && value !== '' ? Number(value) : 0),
+            valueFormatter: (v: unknown) => (v != null && v !== '' ? `$${Number(v).toFixed(2)}` : '$0.00'),
+          },
+          {
+            field: 'user_id',
+            headerName: 'Linked user',
+            width: 220,
+            sortable: false,
+            valueGetter: (_value, row) => row.user_id ?? '',
+            renderCell: ({ row }: { row: Consultant }) => (
+              <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', alignItems: 'center', minHeight: 65, width: '100%' }}>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>User</InputLabel>
+                  <Select
+                    value={row.user_id ?? ''}
+                    label="User"
+                    onChange={(e) => {
+                      const val = e.target.value as string;
+                      const userId = val === '' ? null : val;
+                      linkUserMutation.mutate({ consultantId: row.id, userId });
+                    }}
+                    disabled={linkUserMutation.isPending}
+                  >
+                    <MenuItem value="">
+                      <em>Not linked</em>
+                    </MenuItem>
+                    {authUsers.map((u) => (
+                      <MenuItem key={u.id} value={u.id}>
+                        {u.email ?? u.id}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            ),
+          },
+        ]
+      : []),
     {
       field: 'actions',
       headerName: '',
@@ -254,6 +399,7 @@ export function ConsultantsPage() {
           rows={consultants}
           columns={columns}
           getRowId={(r) => r.id}
+          getRowHeight={() => 65}
           loading={isLoading}
           autoHeight
           onRowClick={({ row }) => openEdit(row)}
@@ -295,27 +441,43 @@ export function ConsultantsPage() {
               helperText={errors.name?.message}
               autoFocus
             />
-            <TextField
-              {...register('cost_per_hour')}
-              label="Cost per hour ($)"
-              type="number"
-              inputProps={{ step: 0.01, min: 0 }}
-              fullWidth
-              error={!!errors.cost_per_hour}
-              helperText={errors.cost_per_hour?.message}
-            />
-            <TextField
-              {...register('charge_out_rate')}
-              label="Charge out rate ($)"
-              type="number"
-              inputProps={{ step: 0.01, min: 0 }}
-              fullWidth
-              error={!!errors.charge_out_rate}
-              helperText={errors.charge_out_rate?.message}
-            />
+            {showAdminColumns && (
+              <>
+                <TextField
+                  {...register('cost_per_hour')}
+                  label="Cost per hour ($)"
+                  type="number"
+                  inputProps={{ step: 0.01, min: 0 }}
+                  fullWidth
+                  error={!!errors.cost_per_hour}
+                  helperText={errors.cost_per_hour?.message}
+                />
+                <TextField
+                  {...register('charge_out_rate')}
+                  label="Charge out rate ($)"
+                  type="number"
+                  inputProps={{ step: 0.01, min: 0 }}
+                  fullWidth
+                  error={!!errors.charge_out_rate}
+                  helperText={errors.charge_out_rate?.message}
+                />
+                <FormControl fullWidth>
+                  <InputLabel>Role</InputLabel>
+                  <Select
+                    value={watch('role') ?? 'user'}
+                    label="Role"
+                    onChange={(e) => setValue('role', e.target.value as 'admin' | 'user')}
+                  >
+                    <MenuItem value="user">User</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                  </Select>
+                </FormControl>
+              </>
+            )}
             {editingId && (
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Checkbox
+                  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() used intentionally
                   checked={!!watch('inactive')}
                   onChange={(e) => setValue('inactive', e.target.checked)}
                 />

@@ -13,6 +13,8 @@ import {
 import {
   People as PeopleIcon,
   Business as BusinessIcon,
+  Schedule as TimesheetsIcon,
+  Assessment as ReportingIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,8 +23,10 @@ import { Breadcrumbs } from './Breadcrumbs';
 const DRAWER_WIDTH = 260;
 
 const navItems = [
-  { path: '/', label: 'Clients', icon: <PeopleIcon /> },
-  { path: '/consultants', label: 'Consultants', icon: <BusinessIcon /> },
+  { path: '/', label: 'Projects', icon: <PeopleIcon />, adminOnly: true },
+  { path: '/timesheets', label: 'Timesheets', icon: <TimesheetsIcon />, adminOnly: false },
+  { path: '/reporting', label: 'Reporting', icon: <ReportingIcon />, adminOnly: false },
+  { path: '/consultants', label: 'Consultants', icon: <BusinessIcon />, adminOnly: true },
 ];
 
 export function AppLayout() {
@@ -30,7 +34,9 @@ export function AppLayout() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, isAdmin } = useAuth();
+
+  const allNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   const handleSignOut = () => {
     signOut();
@@ -43,7 +49,7 @@ export function AppLayout() {
         <img src="/logo.png" alt="Purple Shirt" style={{ maxHeight: 29, width: 'auto' }} />
       </Box>
       <List disablePadding sx={{ flex: 1 }}>
-        {navItems.map(({ path, label, icon }) => (
+        {allNavItems.map(({ path, label, icon }) => (
           <ListItemButton
             key={path}
             selected={location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'))}
@@ -112,7 +118,7 @@ export function AppLayout() {
           minHeight: '100vh',
         }}
       >
-        {!location.pathname.match(/^\/clients\/[^/]+$/) && <Breadcrumbs />}
+        <Breadcrumbs />
         <Outlet />
       </Box>
     </Box>

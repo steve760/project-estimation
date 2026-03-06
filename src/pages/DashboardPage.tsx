@@ -2,35 +2,56 @@ import { useQuery } from '@tanstack/react-query';
 import { Box, Card, CardContent, Typography, Skeleton, Alert } from '@mui/material';
 import { TrendingUp, AttachMoney, People, Folder } from '@mui/icons-material';
 import { supabase } from '../lib/supabase';
-import { computeFinancialSummary } from '../lib/calculations';
-import type { ActivityAssignment } from '../types/database';
+import { useAuth } from '../contexts/AuthContext';
 import type { Consultant } from '../types/database';
 
 async function fetchDashboardData() {
-  const [clientsRes, projectsRes, consultantsRes, assignmentsRes] = await Promise.all([
+  const [clientsRes, projectsRes, consultantsRes, assignmentsRes, activitiesRes, phasesRes] = await Promise.all([
     supabase.from('clients').select('id'),
-    supabase.from('projects').select('id'),
+    supabase.from('projects').select('id, non_billable'),
     supabase.from('consultants').select('*'),
-    supabase.from('activity_assignments').select('id, hours, consultant_id'),
+    supabase.from('activity_assignments').select('activity_id, hours, consultant_id'),
+    supabase.from('activities').select('id, phase_id'),
+    supabase.from('phases').select('id, project_id'),
   ]);
 
   if (clientsRes.error) throw clientsRes.error;
   if (projectsRes.error) throw projectsRes.error;
   if (consultantsRes.error) throw consultantsRes.error;
   if (assignmentsRes.error) throw assignmentsRes.error;
+  if (activitiesRes.error) throw activitiesRes.error;
+  if (phasesRes.error) throw phasesRes.error;
 
   const consultants = (consultantsRes.data ?? []) as Consultant[];
-  const assignments = (assignmentsRes.data ?? []) as ActivityAssignment[];
+  const assignments = (assignmentsRes.data ?? []) as { activity_id: string; hours: number; consultant_id: string }[];
+  const activities = (activitiesRes.data ?? []) as { id: string; phase_id: string }[];
+  const phases = (phasesRes.data ?? []) as { id: string; project_id: string }[];
+  const projects = (projectsRes.data ?? []) as { id: string; non_billable?: boolean }[];
+
+  const phaseToProject = new Map(phases.map((p) => [p.id, p.project_id]));
+  const activityToProject = new Map<string, string>();
+  for (const a of activities) {
+    const p = phaseToProject.get(a.phase_id);
+    if (p) activityToProject.set(a.id, p);
+  }
+  const projectNonBillable = new Map(projects.map((p) => [p.id, Boolean(p.non_billable)]));
+
   const consultantMap = new Map(consultants.map((c) => [c.id, c]));
 
-  const assignmentWithConsultant = assignments
-    .map((a) => ({
-      hours: a.hours,
-      consultant: a.consultant_id != null ? consultantMap.get(a.consultant_id) : undefined,
-    }))
-    .filter((a): a is { hours: number; consultant: Consultant } => !!a.consultant);
-
-  const summary = computeFinancialSummary(assignmentWithConsultant);
+  let cost = 0;
+  let revenue = 0;
+  for (const a of assignments) {
+    const consultant = a.consultant_id != null ? consultantMap.get(a.consultant_id) : undefined;
+    if (!consultant) continue;
+    const hours = Number(a.hours) || 0;
+    const projectId = activityToProject.get(a.activity_id);
+    const nonBillable = projectId ? projectNonBillable.get(projectId) : true;
+    cost += hours * (consultant.cost_per_hour ?? 0);
+    if (!nonBillable) revenue += hours * (consultant.charge_out_rate ?? 0);
+  }
+  const profit = revenue - cost;
+  const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
+  const summary = { cost, revenue, profit, marginPercent };
 
   return {
     clientCount: (clientsRes.data ?? []).length,
@@ -41,6 +62,7 @@ async function fetchDashboardData() {
 }
 
 export function DashboardPage() {
+  const { isAdmin } = useAuth();
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['dashboard'],
     queryFn: fetchDashboardData,
@@ -69,26 +91,14 @@ export function DashboardPage() {
   const projectCount = data?.projectCount ?? 0;
 
   const cards = [
-    {
-      title: 'Total cost',
-      value: `$${summary.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      icon: <AttachMoney sx={{ fontSize: 32, color: 'primary.main' }} />,
-    },
-    {
-      title: 'Total revenue',
-      value: `$${summary.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      icon: <TrendingUp sx={{ fontSize: 32, color: 'success.main' }} />,
-    },
-    {
-      title: 'Clients',
-      value: clientCount,
-      icon: <People sx={{ fontSize: 32, color: 'primary.main' }} />,
-    },
-    {
-      title: 'Projects',
-      value: projectCount,
-      icon: <Folder sx={{ fontSize: 32, color: 'primary.main' }} />,
-    },
+    ...(isAdmin
+      ? [
+          { title: 'Total cost', value: `$${summary.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, icon: <AttachMoney sx={{ fontSize: 32, color: 'primary.main' }} /> },
+          { title: 'Total revenue', value: `$${summary.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, icon: <TrendingUp sx={{ fontSize: 32, color: 'success.main' }} /> },
+        ]
+      : []),
+    { title: 'Projects', value: clientCount, icon: <People sx={{ fontSize: 32, color: 'primary.main' }} /> },
+    { title: 'Projects', value: projectCount, icon: <Folder sx={{ fontSize: 32, color: 'primary.main' }} /> },
   ];
 
   return (
@@ -97,12 +107,12 @@ export function DashboardPage() {
         Dashboard
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-        Overview of costs, revenue, and key metrics across all projects.
+        {isAdmin ? 'Overview of costs, revenue, and key metrics across all projects.' : 'Overview of key metrics.'}
       </Typography>
 
       {isError && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          Could not load dashboard data. {error instanceof Error ? error.message : 'Check your connection and try again.'} Use the sidebar to open Clients or Consultants.
+          Could not load dashboard data. {error instanceof Error ? error.message : 'Check your connection and try again.'} Use the sidebar to open Projects or Consultants.
         </Alert>
       )}
 
@@ -124,6 +134,7 @@ export function DashboardPage() {
         ))}
       </Box>
 
+      {isAdmin && (
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
@@ -155,6 +166,7 @@ export function DashboardPage() {
           </Box>
         </CardContent>
       </Card>
+      )}
     </Box>
   );
 }
