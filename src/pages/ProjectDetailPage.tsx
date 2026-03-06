@@ -114,7 +114,7 @@ async function fetchProjectDetail(projectId: string) {
     const assignmentsByActivity = new Map<string, (ActivityAssignment & { consultant?: Consultant })[]>();
     for (const a of assignmentsList) {
       const list = assignmentsByActivity.get(a.activity_id) ?? [];
-      list.push({ ...a, consultant: consultantMap.get(a.consultant_id) });
+      list.push({ ...a, consultant: a.consultant_id != null ? consultantMap.get(a.consultant_id) : undefined });
       assignmentsByActivity.set(a.activity_id, list);
     }
     for (const list of assignmentsByActivity.values()) {

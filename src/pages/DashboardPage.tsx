@@ -26,7 +26,7 @@ async function fetchDashboardData() {
   const assignmentWithConsultant = assignments
     .map((a) => ({
       hours: a.hours,
-      consultant: consultantMap.get(a.consultant_id),
+      consultant: a.consultant_id != null ? consultantMap.get(a.consultant_id) : undefined,
     }))
     .filter((a): a is { hours: number; consultant: Consultant } => !!a.consultant);
 
