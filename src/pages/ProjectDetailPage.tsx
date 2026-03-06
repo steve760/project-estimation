@@ -48,7 +48,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { supabase } from '../lib/supabase';
-import type { Project, Phase, Activity, ActivityAssignment, Consultant } from '../types/database';
+import type { Project, Phase, Activity, ActivityAssignment, Consultant, PhaseWithActivitiesDisplay, ActivityWithAssignmentsDisplay } from '../types/database';
 import type { ProjectConsultantRate } from '../types/database';
 import { computeFinancialSummary, roundCurrency } from '../lib/calculations';
 
@@ -78,7 +78,7 @@ async function fetchProjectDetail(projectId: string) {
       .order('sort_order');
     const phaseList = (phases ?? []) as Phase[];
     if (phaseList.length === 0) {
-      return { project: { ...project, phases: [] } as Project & { client?: { id: string; name: string }; phases: Phase[] } };
+      return { project: { ...project, phases: [] } as Project & { client?: { id: string; name: string }; phases: PhaseWithActivitiesDisplay[] } };
     }
 
     const phaseIds = phaseList.map((p) => p.id);
@@ -89,11 +89,11 @@ async function fetchProjectDetail(projectId: string) {
       .order('sort_order');
     const activitiesList = (activities ?? []) as Activity[];
     if (activitiesList.length === 0) {
-      const phasesWithActivities = phaseList.map((ph) => ({ ...ph, activities: [] }));
+      const phasesWithActivities: PhaseWithActivitiesDisplay[] = phaseList.map((ph) => ({ ...ph, activities: [] }));
       return {
         project: { ...project, phases: phasesWithActivities } as Project & {
           client?: { id: string; name: string };
-          phases: (Phase & { activities?: Activity[] })[];
+          phases: PhaseWithActivitiesDisplay[];
         },
       };
     }
@@ -122,25 +122,19 @@ async function fetchProjectDetail(projectId: string) {
       list.sort((x, y) => (x.sort_order ?? 0) - (y.sort_order ?? 0));
     }
 
-    const activitiesByPhase = new Map<string, (Activity & { assignments?: (ActivityAssignment & { consultant?: Consultant })[] })[]>();
+    const activitiesByPhase = new Map<string, ActivityWithAssignmentsDisplay[]>();
     for (const act of activitiesList) {
       const list = activitiesByPhase.get(act.phase_id) ?? [];
       list.push({ ...act, assignments: assignmentsByActivity.get(act.id) ?? [] });
       activitiesByPhase.set(act.phase_id, list);
     }
 
-    const phasesWithActivities: (Phase & {
-      activities?: (Activity & { assignments?: (ActivityAssignment & { consultant?: Consultant })[] })[];
-    })[] = phaseList.map((ph) => ({ ...ph, activities: activitiesByPhase.get(ph.id) ?? [] }));
+    const phasesWithActivities: PhaseWithActivitiesDisplay[] = phaseList.map((ph) => ({ ...ph, activities: activitiesByPhase.get(ph.id) ?? [] }));
 
     return {
       project: { ...project, phases: phasesWithActivities } as Project & {
         client?: { id: string; name: string };
-        phases: (Phase & {
-          activities?: (Activity & {
-            assignments?: (ActivityAssignment & { consultant?: Consultant })[];
-          })[];
-        })[];
+        phases: PhaseWithActivitiesDisplay[];
       },
     };
   } catch (err) {
@@ -161,13 +155,7 @@ type FlatRow = {
   sortOrder: number;
 };
 
-function flattenProjectToRows(project: {
-  phases?: (Phase & {
-    activities?: (Activity & {
-      assignments?: (ActivityAssignment & { consultant?: Consultant })[];
-    })[];
-  })[];
-}): FlatRow[] {
+function flattenProjectToRows(project: { phases?: PhaseWithActivitiesDisplay[] }): FlatRow[] {
   const rows: FlatRow[] = [];
   for (const phase of project.phases ?? []) {
     for (const activity of phase.activities ?? []) {
@@ -315,7 +303,8 @@ export function ProjectDetailPage() {
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['project', projectId],
-    queryFn: () => fetchProjectDetail(projectId!),
+    queryFn: (): Promise<{ project: Project & { client?: { id: string; name: string }; phases: PhaseWithActivitiesDisplay[] } }> =>
+      fetchProjectDetail(projectId!),
     enabled: !!projectId,
   });
 
@@ -410,14 +399,15 @@ export function ProjectDetailPage() {
           ...old,
           project: {
             ...project,
-            phases: project.phases.map((phase) => ({
+            phases: project.phases.map((phase: PhaseWithActivitiesDisplay) => ({
               ...phase,
-              activities: phase.activities?.map((act) =>
+              activities: phase.activities?.map((act: ActivityWithAssignmentsDisplay) =>
                 act.id === newAssignment.activity_id
                   ? {
                       ...act,
                       assignments: [...(act.assignments ?? []), fullAssignment].sort(
-                        (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+                        (a: ActivityAssignment & { consultant?: Consultant }, b: ActivityAssignment & { consultant?: Consultant }) =>
+                          (a.sort_order ?? 0) - (b.sort_order ?? 0)
                       ),
                     }
                   : act
@@ -688,7 +678,7 @@ export function ProjectDetailPage() {
     const phase = phases.find((p) => p.id === phaseId);
     const activitiesInPhase = phase?.activities ?? [];
     if (!activityId && newRow.activityNameNew.trim()) {
-      const existing = activitiesInPhase.find((a) => a.name.toLowerCase() === newRow.activityNameNew.trim().toLowerCase());
+      const existing = activitiesInPhase.find((a: ActivityWithAssignmentsDisplay) => a.name.toLowerCase() === newRow.activityNameNew.trim().toLowerCase());
       if (existing) activityId = existing.id;
       else {
         try {
@@ -726,7 +716,7 @@ export function ProjectDetailPage() {
 
   const phaseOptions = phases.map((p) => p.name);
   const selectedPhaseId = newRow.phaseId || (newRow.phaseNameNew && phases.find((p) => p.name.toLowerCase() === newRow.phaseNameNew.trim().toLowerCase())?.id);
-  const activityOptions = (phases.find((p) => p.id === selectedPhaseId)?.activities ?? []).map((a) => a.name);
+  const activityOptions = (phases.find((p) => p.id === selectedPhaseId)?.activities ?? []).map((a: ActivityWithAssignmentsDisplay) => a.name);
   const canSave =
     (newRow.phaseId || newRow.phaseNameNew.trim()) &&
     (newRow.activityId || newRow.activityNameNew.trim()) &&
@@ -735,7 +725,7 @@ export function ProjectDetailPage() {
     !Number.isNaN(Number(newRow.hours)) &&
     Number(newRow.hours) >= 0;
 
-  const activitiesForPhase = (phaseId: string) =>
+  const activitiesForPhase = (phaseId: string): ActivityWithAssignmentsDisplay[] =>
     phases.find((p) => p.id === phaseId)?.activities ?? [];
 
   return (
@@ -1000,7 +990,7 @@ export function ProjectDetailPage() {
                       : newRow.activityNameNew}
                     onInputChange={(_, value) => {
                       const acts = activitiesForPhase(selectedPhaseId ?? '');
-                      const existing = acts.find((a) => a.name === value);
+                      const existing = acts.find((a: ActivityWithAssignmentsDisplay) => a.name === value);
                       setNewRow((r) => ({
                         ...r,
                         activityId: existing?.id ?? '',
@@ -1010,7 +1000,7 @@ export function ProjectDetailPage() {
                     onChange={(_, value) => {
                       const name = typeof value === 'string' ? value : value ?? '';
                       const acts = activitiesForPhase(selectedPhaseId ?? '');
-                      const existing = acts.find((a) => a.name === name);
+                      const existing = acts.find((a: ActivityWithAssignmentsDisplay) => a.name === name);
                       setNewRow((r) => ({
                         ...r,
                         activityId: existing?.id ?? '',

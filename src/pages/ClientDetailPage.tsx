@@ -27,6 +27,8 @@ import type {
   Activity,
   ActivityAssignment,
   Consultant,
+  PhaseWithActivitiesDisplay,
+  ActivityWithAssignmentsDisplay,
 } from '../types/database';
 import { computeFinancialSummary, roundCurrency } from '../lib/calculations';
 
@@ -36,11 +38,7 @@ const projectSchema = z.object({
 type ProjectForm = z.infer<typeof projectSchema>;
 
 interface ProjectWithDetails extends Project {
-  phases?: (Phase & {
-    activities?: (Activity & {
-      assignments?: (ActivityAssignment & { consultant?: Consultant })[];
-    })[];
-  })[];
+  phases?: PhaseWithActivitiesDisplay[];
 }
 
 async function fetchClientWithProjects(clientId: string) {
@@ -66,10 +64,10 @@ async function fetchClientWithProjects(clientId: string) {
   const { data: allActivities } = await supabase.from('activities').select('*').in('phase_id', phaseIds).order('sort_order');
   const activitiesList = (allActivities ?? []) as Activity[];
   if (activitiesList.length === 0) {
-    const phasesByProject = new Map<string, Phase[]>();
+    const phasesByProject = new Map<string, PhaseWithActivitiesDisplay[]>();
     for (const ph of phasesList) {
       const list = phasesByProject.get(ph.project_id) ?? [];
-      list.push(ph);
+      list.push({ ...ph, activities: [] });
       phasesByProject.set(ph.project_id, list);
     }
     return {
@@ -97,14 +95,14 @@ async function fetchClientWithProjects(clientId: string) {
   }
   for (const list of assignmentsByActivity.values()) list.sort((x, y) => (x.sort_order ?? 0) - (y.sort_order ?? 0));
 
-  const activitiesByPhase = new Map<string, (Activity & { assignments?: (ActivityAssignment & { consultant?: Consultant })[] })[]>();
+  const activitiesByPhase = new Map<string, ActivityWithAssignmentsDisplay[]>();
   for (const act of activitiesList) {
     const list = activitiesByPhase.get(act.phase_id) ?? [];
     list.push({ ...act, assignments: assignmentsByActivity.get(act.id) ?? [] });
     activitiesByPhase.set(act.phase_id, list);
   }
 
-  const phasesByProject = new Map<string, (Phase & { activities?: (Activity & { assignments?: (ActivityAssignment & { consultant?: Consultant })[] })[] })[]>();
+  const phasesByProject = new Map<string, PhaseWithActivitiesDisplay[]>();
   for (const ph of phasesList) {
     const list = phasesByProject.get(ph.project_id) ?? [];
     list.push({ ...ph, activities: activitiesByPhase.get(ph.id) ?? [] });
@@ -126,7 +124,7 @@ export function ClientDetailPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['client', clientId],
-    queryFn: () => fetchClientWithProjects(clientId!),
+    queryFn: (): Promise<{ client: Client; projects: ProjectWithDetails[] }> => fetchClientWithProjects(clientId!),
     enabled: !!clientId,
   });
 

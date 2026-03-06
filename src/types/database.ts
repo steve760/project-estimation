@@ -95,3 +95,12 @@ export interface ProjectConsultantRate {
   created_at?: string;
   updated_at?: string;
 }
+
+// Phase/Activity with nested assignments (for project detail views)
+export interface ActivityWithAssignmentsDisplay extends Activity {
+  assignments?: (ActivityAssignment & { consultant?: Consultant })[];
+}
+
+export interface PhaseWithActivitiesDisplay extends Phase {
+  activities?: ActivityWithAssignmentsDisplay[];
+}
