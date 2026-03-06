@@ -642,28 +642,26 @@ export function ProjectDetailPage() {
   };
 
   const handleCopyTableToWord = async () => {
-    const headers = ['Phase', 'Activity', 'Consultant', 'Hours', 'Cost', 'Revenue'];
+    const headers = ['Phase', 'Activity', 'Revenue'];
     const headerRow = '<tr>' + headers.map((h) => `<th>${h}</th>`).join('') + '</tr>';
     const dataRows = rows
       .filter((r) => r.assignmentId)
       .map((row) => {
         const consultant = consultants.find((c) => c.id === row.consultantId);
-        const cost = consultant ? row.hours * consultant.cost_per_hour : 0;
         const revenue = consultant ? row.hours * getChargeRate(consultant) : 0;
-        return `<tr><td>${row.phaseName}</td><td>${row.activityName}</td><td>${row.consultantName}</td><td>${row.hours}</td><td>${roundCurrency(cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td><td>${roundCurrency(revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>`;
+        return `<tr><td>${row.phaseName}</td><td>${row.activityName}</td><td>${roundCurrency(revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>`;
       })
       .join('');
-    const totalRow = `<tr><td colspan="3"><strong>Total</strong></td><td></td><td></td><td><strong>${roundCurrency(revenueTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></td></tr>`;
+    const totalRow = `<tr><td colspan="2"><strong>Total - Excludes GST and project related expenses</strong></td><td><strong>${roundCurrency(revenueTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></td></tr>`;
     const html = `<table border="1" cellpadding="4" cellspacing="0"><thead>${headerRow}</thead><tbody>${dataRows}${totalRow}</tbody></table>`;
     const plain = [
       headers.join('\t'),
       ...rows.filter((r) => r.assignmentId).map((row) => {
         const consultant = consultants.find((c) => c.id === row.consultantId);
-        const cost = consultant ? row.hours * consultant.cost_per_hour : 0;
         const revenue = consultant ? row.hours * getChargeRate(consultant) : 0;
-        return [row.phaseName, row.activityName, row.consultantName, row.hours, roundCurrency(cost).toLocaleString('en-US', { minimumFractionDigits: 2 }), roundCurrency(revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })].join('\t');
+        return [row.phaseName, row.activityName, roundCurrency(revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })].join('\t');
       }),
-      ['Total', '', '', '', '', roundCurrency(revenueTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })].join('\t'),
+      ['Total - Excludes GST and project related expenses', '', roundCurrency(revenueTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })].join('\t'),
     ].join('\n');
     await navigator.clipboard.write([
       new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) }),
@@ -841,22 +839,20 @@ export function ProjectDetailPage() {
         fullWidth
       >
         <DialogTitle>Edit row</DialogTitle>
-        <DialogContent sx={{ '& .MuiFormControl-root': { mb: 3 } }}>
+        <DialogContent sx={{ pt: 1, '& .MuiFormControl-root': { marginBottom: 20 } }}>
           <Autocomplete
             size="small"
             options={phases}
             getOptionLabel={(p) => p.name}
             value={phases.find((p) => p.id === activityToEdit?.phaseId) ?? null}
             onChange={(_, value) => setActivityToEdit((a) => (a && value ? { ...a, phaseId: value.id, phaseName: value.name } : a))}
-            renderInput={(params) => <TextField {...params} label="Phase" sx={{ mt: 1 }} />}
-            sx={{ mb: 3 }}
+            renderInput={(params) => <TextField {...params} label="Phase" />}
           />
           <TextField
             fullWidth
             label="Activity name"
             value={activityToEdit?.activityName ?? ''}
             onChange={(e) => setActivityToEdit((a) => (a ? { ...a, activityName: e.target.value } : null))}
-            sx={{ mb: 3 }}
           />
           <Autocomplete
             size="small"
@@ -865,7 +861,6 @@ export function ProjectDetailPage() {
             value={consultants.find((c) => c.id === activityToEdit?.consultantId) ?? null}
             onChange={(_, value) => setActivityToEdit((a) => (a ? { ...a, consultantId: value?.id ?? '' } : null))}
             renderInput={(params) => <TextField {...params} label="Consultant" />}
-            sx={{ mb: 3 }}
           />
           <TextField
             fullWidth
@@ -1021,9 +1016,7 @@ export function ProjectDetailPage() {
               </SortableContext>
               <TableRow sx={{ bgcolor: 'grey.100', fontWeight: 700, '& .MuiTableCell-root': { verticalAlign: 'middle' } }}>
                 <TableCell />
-                <TableCell colSpan={3} sx={{ fontWeight: 700 }}>Total</TableCell>
-                <TableCell align="center" />
-                <TableCell align="right" sx={{ fontWeight: 700 }}>${roundCurrency(summary.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</TableCell>
+                <TableCell colSpan={5} sx={{ fontWeight: 700 }}>Total - Excludes GST and project related expenses</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 700 }}>
                   ${roundCurrency(revenueTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </TableCell>

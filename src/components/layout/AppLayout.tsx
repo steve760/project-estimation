@@ -71,7 +71,7 @@ export function AppLayout() {
         ))}
       </List>
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-        <img src="/logo.png" alt="Purple Shirt" style={{ maxHeight: 48, width: 'auto' }} />
+        <img src="/logo.png" alt="Purple Shirt" style={{ maxHeight: 29, width: 'auto' }} />
       </Box>
       <Box sx={{ px: 2, py: 2, mt: 'auto', borderTop: 1, borderColor: 'divider' }}>
         <Link

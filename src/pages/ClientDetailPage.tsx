@@ -44,7 +44,7 @@ interface ProjectWithDetails extends Project {
 async function fetchClientWithProjects(clientId: string) {
   const [clientRes, projectsRes] = await Promise.all([
     supabase.from('clients').select('*').eq('id', clientId).single(),
-    supabase.from('projects').select('*').eq('client_id', clientId).order('created_at'),
+    supabase.from('projects').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
   ]);
   const { data: client, error: clientError } = clientRes;
   const { data: projects } = projectsRes;
