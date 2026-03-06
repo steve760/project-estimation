@@ -6,7 +6,6 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Typography,
   Link,
   useTheme,
   useMediaQuery,
@@ -40,12 +39,9 @@ export function AppLayout() {
 
   const drawer = (
     <Box sx={{ py: 2, px: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Typography
-        variant="h6"
-        sx={{ px: 2, mb: 2, fontWeight: 700, color: 'primary.main' }}
-      >
-        Project Estimation
-      </Typography>
+      <Box sx={{ px: 2, pb: 2, display: 'flex', justifyContent: 'flex-start' }}>
+        <img src="/logo.png" alt="Purple Shirt" style={{ maxHeight: 29, width: 'auto' }} />
+      </Box>
       <List disablePadding sx={{ flex: 1 }}>
         {navItems.map(({ path, label, icon }) => (
           <ListItemButton
@@ -70,9 +66,6 @@ export function AppLayout() {
           </ListItemButton>
         ))}
       </List>
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-        <img src="/logo.png" alt="Purple Shirt" style={{ maxHeight: 29, width: 'auto' }} />
-      </Box>
       <Box sx={{ px: 2, py: 2, mt: 'auto', borderTop: 1, borderColor: 'divider' }}>
         <Link
           component="button"

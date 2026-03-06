@@ -53,7 +53,7 @@ export interface Activity {
 export interface ActivityAssignment {
   id: string;
   activity_id: string;
-  consultant_id: string;
+  consultant_id: string | null;
   hours: number;
   sort_order: number;
   created_at: string;

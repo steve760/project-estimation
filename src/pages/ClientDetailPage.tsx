@@ -82,7 +82,7 @@ async function fetchClientWithProjects(clientId: string) {
     supabase.from('activity_assignments').select('consultant_id').in('activity_id', activityIds),
   ]);
   const assignmentsList = (assignmentsRes.data ?? []) as ActivityAssignment[];
-  const cIds = [...new Set((consultantIdsRes.data ?? []).map((a: { consultant_id: string }) => a.consultant_id))];
+  const cIds = [...new Set((consultantIdsRes.data ?? []).map((a: { consultant_id: string | null }) => a.consultant_id).filter(Boolean))] as string[];
   const { data: consultantsList } = cIds.length
     ? await supabase.from('consultants').select('*').in('id', cIds)
     : { data: [] };

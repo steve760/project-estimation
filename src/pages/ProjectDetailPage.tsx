@@ -102,7 +102,7 @@ async function fetchProjectDetail(projectId: string) {
       supabase.from('activity_assignments').select('*').in('activity_id', activityIds),
       (async () => {
         const { data: asn } = await supabase.from('activity_assignments').select('consultant_id').in('activity_id', activityIds);
-        const cIds = [...new Set((asn ?? []).map((a: { consultant_id: string }) => a.consultant_id))];
+        const cIds = [...new Set((asn ?? []).map((a: { consultant_id: string | null }) => a.consultant_id).filter(Boolean))] as string[];
         if (cIds.length === 0) return { data: [] };
         return supabase.from('consultants').select('*').in('id', cIds);
       })(),
@@ -166,7 +166,7 @@ function flattenProjectToRows(project: { phases?: PhaseWithActivitiesDisplay[] }
             phaseName: phase.name,
             activityId: activity.id,
             activityName: activity.name,
-            consultantId: a.consultant_id,
+            consultantId: a.consultant_id ?? '',
             consultantName: a.consultant?.name ?? '—',
             consultantAvatarUrl: a.consultant?.avatar_url ?? null,
             consultantColor: a.consultant?.color ?? null,
@@ -449,8 +449,8 @@ export function ProjectDetailPage() {
   });
 
   const updateAssignmentMutation = useMutation({
-    mutationFn: async ({ id, hours, consultant_id }: { id: string; hours: number; consultant_id?: string }) => {
-      const payload: { hours: number; consultant_id?: string } = { hours };
+    mutationFn: async ({ id, hours, consultant_id }: { id: string; hours: number; consultant_id?: string | null }) => {
+      const payload: { hours: number; consultant_id?: string | null } = { hours };
       if (consultant_id !== undefined) payload.consultant_id = consultant_id;
       const { error } = await supabase.from('activity_assignments').update(payload).eq('id', id);
       if (error) throw error;
@@ -472,18 +472,35 @@ export function ProjectDetailPage() {
   const duplicateAssignmentMutation = useMutation({
     mutationFn: async ({
       activity_id,
-      consultant_id,
       hours,
-      sort_order,
+      insert_after_sort_order,
     }: {
       activity_id: string;
-      consultant_id: string;
       hours: number;
-      sort_order: number;
+      insert_after_sort_order: number;
     }) => {
-      const { error } = await supabase
+      const newSortOrder = insert_after_sort_order + 1;
+      const { data: existing } = await supabase
         .from('activity_assignments')
-        .insert({ activity_id, consultant_id, hours, sort_order });
+        .select('id, sort_order')
+        .eq('activity_id', activity_id)
+        .gte('sort_order', newSortOrder)
+        .order('sort_order', { ascending: true });
+      if (existing?.length) {
+        for (let i = existing.length - 1; i >= 0; i--) {
+          const { error } = await supabase
+            .from('activity_assignments')
+            .update({ sort_order: (existing[i].sort_order ?? 0) + 1 })
+            .eq('id', existing[i].id);
+          if (error) throw error;
+        }
+      }
+      const { error } = await supabase.from('activity_assignments').insert({
+        activity_id,
+        consultant_id: null,
+        hours,
+        sort_order: newSortOrder,
+      });
       if (error) throw error;
     },
     onSuccess: invalidate,
@@ -632,12 +649,10 @@ export function ProjectDetailPage() {
 
   const handleDuplicateRow = (row: FlatRow) => {
     if (!row.assignmentId) return;
-    const nextSortOrder = Math.max(...rows.map((r) => r.sortOrder), 0) + 1;
     duplicateAssignmentMutation.mutate({
       activity_id: row.activityId,
-      consultant_id: row.consultantId,
       hours: row.hours,
-      sort_order: nextSortOrder,
+      insert_after_sort_order: row.sortOrder,
     });
   };
 
@@ -839,7 +854,7 @@ export function ProjectDetailPage() {
         fullWidth
       >
         <DialogTitle>Edit row</DialogTitle>
-        <DialogContent sx={{ pt: 1, '& .MuiFormControl-root': { marginBottom: 20 } }}>
+        <DialogContent sx={{ pt: 0, '& .MuiFormControl-root': { marginBottom: 2 } }}>
           <Autocomplete
             size="small"
             options={phases}
@@ -884,7 +899,7 @@ export function ProjectDetailPage() {
                 {
                   onSuccess: () => {
                     updateAssignmentMutation.mutate(
-                      { id: activityToEdit.assignmentId, hours: activityToEdit.hours, consultant_id: activityToEdit.consultantId || undefined },
+                      { id: activityToEdit.assignmentId, hours: activityToEdit.hours, consultant_id: activityToEdit.consultantId || null },
                       { onSuccess: () => setActivityToEdit(null) }
                     );
                   },
@@ -1014,13 +1029,13 @@ export function ProjectDetailPage() {
                 });
               })()}
               </SortableContext>
-              <TableRow sx={{ bgcolor: 'grey.100', fontWeight: 700, '& .MuiTableCell-root': { verticalAlign: 'middle' } }}>
-                <TableCell />
-                <TableCell colSpan={5} sx={{ fontWeight: 700 }}>Total - Excludes GST and project related expenses</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700 }}>
+              <TableRow sx={{ bgcolor: 'grey.100', fontWeight: 700, '& .MuiTableCell-root': { verticalAlign: 'middle', py: 1.5 } }}>
+                <TableCell sx={{ py: 1.5 }} />
+                <TableCell colSpan={5} sx={{ fontWeight: 700, py: 1.5 }}>Total - Excludes GST and project related expenses</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, py: 1.5 }}>
                   ${roundCurrency(revenueTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </TableCell>
-                <TableCell />
+                <TableCell sx={{ py: 1.5 }} />
               </TableRow>
               {addRowError && (
                 <TableRow>

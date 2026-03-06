@@ -20,7 +20,7 @@ async function fetchDashboardData() {
   if (assignmentsRes.error) throw assignmentsRes.error;
 
   const consultants = (consultantsRes.data ?? []) as Consultant[];
-  const assignments = (assignmentsRes.data ?? []) as (ActivityAssignment & { consultant_id: string })[];
+  const assignments = (assignmentsRes.data ?? []) as ActivityAssignment[];
   const consultantMap = new Map(consultants.map((c) => [c.id, c]));
 
   const assignmentWithConsultant = assignments

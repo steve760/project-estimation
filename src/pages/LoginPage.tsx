@@ -58,20 +58,20 @@ export function LoginPage() {
       }}
     >
       <Card sx={{ maxWidth: 400, width: '100%' }}>
-        <CardContent sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+        <CardContent sx={{ p: 4, '&:last-child': { pb: 4 } }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
             <img src="/logo.png" alt="Purple Shirt" style={{ maxHeight: 56, width: 'auto' }} />
           </Box>
-          <Typography variant="h6" gutterBottom fontWeight={600} sx={{ textAlign: 'center', mb: 2, fontSize: '1rem' }}>
+          <Typography variant="h6" gutterBottom fontWeight={600} sx={{ textAlign: 'center', mb: 3, fontSize: '1rem' }}>
             Project cost estimation
           </Typography>
           {!isSupabaseConfigured && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
+            <Alert severity="warning" sx={{ mb: 3 }}>
               Sign-in is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your deployment environment (e.g. Vercel).
             </Alert>
           )}
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ mb: 3 }}>
               {error}
             </Alert>
           )}
@@ -83,7 +83,7 @@ export function LoginPage() {
               fullWidth
               error={!!errors.email}
               helperText={errors.email?.message}
-              sx={{ mb: 2 }}
+              sx={{ mb: 3 }}
             />
             <TextField
               {...register('password')}
@@ -92,7 +92,7 @@ export function LoginPage() {
               fullWidth
               error={!!errors.password}
               helperText={errors.password?.message}
-              sx={{ mb: 2 }}
+              sx={{ mb: 3 }}
             />
             <Button
               type="submit"
@@ -100,7 +100,7 @@ export function LoginPage() {
               fullWidth
               size="large"
               disabled={isSubmitting}
-              sx={{ mb: 1 }}
+              sx={{ mt: 1, mb: 1 }}
             >
               Sign in
             </Button>
