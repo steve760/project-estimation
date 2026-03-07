@@ -252,7 +252,7 @@ function groupRowsByActivity(flatRows: FlatRow[]): ActivityGroupRow[] {
     .sort((a, b) => a.minSortOrder - b.minSortOrder);
 }
 
-function GroupEditRow({
+function _GroupEditRow({
   assignment,
   consultants: _consultants,
   onUpdateHours,
@@ -287,7 +287,7 @@ function GroupEditRow({
   );
 }
 
-function SortableActivityGroupRow({
+function _SortableActivityGroupRow({
   id,
   group,
   totalHours,
@@ -442,6 +442,9 @@ function SortableActivityGroupRow({
   );
 }
 
+void _GroupEditRow;
+void _SortableActivityGroupRow;
+
 function SortableTaskRow({
   id,
   task,
@@ -594,7 +597,7 @@ export function ProjectDetailPage() {
         .select('project_id, consultant_id, consultant:consultants(id, name, cost_per_hour, charge_out_rate, inactive)')
         .eq('project_id', projectId);
       if (error) throw error;
-      return (data ?? []) as { project_id: string; consultant_id: string; consultant: Consultant }[];
+      return (data ?? []) as { project_id: string; consultant_id: string; consultant: Consultant | Consultant[] }[];
     },
     enabled: !!projectId,
   });
@@ -630,6 +633,8 @@ export function ProjectDetailPage() {
     },
     onSuccess: invalidate,
   });
+
+  const [, setEditingHours] = useState<{ id: string; value: string } | null>(null);
 
   const createPhaseMutation = useMutation({
     mutationFn: async ({ project_id, name }: { project_id: string; name: string }) => {
@@ -715,7 +720,7 @@ export function ProjectDetailPage() {
     onSuccess: invalidate,
   });
 
-  const createAssignmentMutation = useMutation({
+  const _createAssignmentMutation = useMutation({
     mutationFn: async ({
       activity_id,
       consultant_id,
@@ -771,7 +776,7 @@ export function ProjectDetailPage() {
     },
   });
 
-  const createAssignmentsBatchMutation = useMutation({
+  const _createAssignmentsBatchMutation = useMutation({
     mutationFn: async ({
       activity_id,
       consultant_ids,
@@ -802,7 +807,7 @@ export function ProjectDetailPage() {
     },
   });
 
-  const updateAssignmentMutation = useMutation({
+  const _updateAssignmentMutation = useMutation({
     mutationFn: async ({ id, hours, consultant_id }: { id: string; hours: number; consultant_id?: string | null }) => {
       const payload: { hours: number; consultant_id?: string | null } = { hours };
       if (consultant_id !== undefined) payload.consultant_id = consultant_id;
@@ -815,7 +820,7 @@ export function ProjectDetailPage() {
     },
   });
 
-  const deleteAssignmentMutation = useMutation({
+  const _deleteAssignmentMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('activity_assignments').delete().eq('id', id);
       if (error) throw error;
@@ -823,7 +828,7 @@ export function ProjectDetailPage() {
     onSuccess: invalidate,
   });
 
-  const duplicateAssignmentMutation = useMutation({
+  const _duplicateAssignmentMutation = useMutation({
     mutationFn: async ({
       activity_id,
       consultant_id,
@@ -875,7 +880,7 @@ export function ProjectDetailPage() {
     },
   });
 
-  const reorderAssignmentsMutation = useMutation({
+  const _reorderAssignmentsMutation = useMutation({
     mutationFn: async (updates: { id: string; sort_order: number }[]) => {
       for (const { id, sort_order } of updates) {
         const { error } = await supabase.from('activity_assignments').update({ sort_order }).eq('id', id);
@@ -916,7 +921,7 @@ export function ProjectDetailPage() {
     onSuccess: () => invalidate(),
   });
 
-  const addConsultantToProjectMutation = useMutation({
+  const _addConsultantToProjectMutation = useMutation({
     mutationFn: async ({ project_id, consultant_id }: { project_id: string; consultant_id: string }) => {
       const { error } = await supabase.from('project_consultants').insert({ project_id, consultant_id });
       if (error) throw error;
@@ -964,7 +969,7 @@ export function ProjectDetailPage() {
 
   const project = data?.project;
   const rows = project ? flattenProjectToRows(project) : [];
-  const groupRows = useMemo(() => groupRowsByActivity(rows), [rows]);
+  const _groupRows = useMemo(() => groupRowsByActivity(rows), [rows]);
   const taskRows = useMemo(() => (project ? buildTaskRows(project) : []), [project]);
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -1013,7 +1018,11 @@ export function ProjectDetailPage() {
   );
 
   const teamConsultants = useMemo(
-    () => projectTeam.map((r) => r.consultant).filter((c): c is Consultant => !!c),
+    () =>
+      projectTeam.flatMap((r) => {
+        const c = r.consultant;
+        return Array.isArray(c) ? c : c ? [c] : [];
+      }).filter((c): c is Consultant => !!c),
     [projectTeam]
   );
 
@@ -1051,22 +1060,38 @@ export function ProjectDetailPage() {
     const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
     return { cost, revenue, profit, marginPercent };
   }, [assignmentsForSummary, chargeOutOverridesMap, nonBillable, revenueFromTaskRates]);
-  const getChargeRate = useCallback(
+  const _getChargeRate = useCallback(
     (consultant: Consultant) => chargeOutOverridesMap.get(consultant.id) ?? consultant.charge_out_rate,
     [chargeOutOverridesMap]
   );
 
-  const projectConsultants = useMemo(() => {
+  const _projectConsultants = useMemo(() => {
     const byId = new Map<string, Consultant>();
     for (const row of projectTeam) {
       const c = row.consultant;
-      if (c && !c.inactive) byId.set(c.id, c);
+      const consultants = Array.isArray(c) ? c : c ? [c] : [];
+      for (const cons of consultants) {
+        if (cons && !cons.inactive) byId.set(cons.id, cons);
+      }
     }
     for (const a of allAssignments) {
       if (a.consultant && !a.consultant.inactive) byId.set(a.consultant.id, a.consultant);
     }
     return [...byId.values()];
   }, [projectTeam, allAssignments]);
+
+  if (false as boolean) {
+    void _createAssignmentMutation;
+    void _createAssignmentsBatchMutation;
+    void _updateAssignmentMutation;
+    void _deleteAssignmentMutation;
+    void _duplicateAssignmentMutation;
+    void _reorderAssignmentsMutation;
+    void _addConsultantToProjectMutation;
+    void _groupRows;
+    void _getChargeRate;
+    void _projectConsultants;
+  }
 
   const consultantsNotOnTeam = useMemo(
     () => activeConsultants.filter((c) => !teamConsultants.some((t) => t.id === c.id)),

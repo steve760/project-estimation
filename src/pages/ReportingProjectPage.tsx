@@ -133,7 +133,6 @@ export function ReportingProjectPage() {
 
   const phases = projectStructure?.phases ?? [];
   const activities = projectStructure?.activities ?? [];
-  const assignments = projectStructure?.assignments ?? [];
 
   const { data: consultants = [] } = useQuery({
     queryKey: ['consultants'],
@@ -434,7 +433,7 @@ export function ReportingProjectPage() {
         }
       }
     }
-    const data = weekRanges.map((range, i) => ({ week: weekLabels[i], hours: byWeek[i] }));
+    const data = weekRanges.map((_range, i) => ({ week: weekLabels[i], hours: byWeek[i] }));
     return { data };
   }, [timeEntries, month, consultantId, isWholeOfLife]);
 
