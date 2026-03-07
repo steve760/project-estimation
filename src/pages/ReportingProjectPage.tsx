@@ -217,6 +217,7 @@ export function ReportingProjectPage() {
     const loggedByActivity = new Map<string, number>();
     const taskLoggedMap = new Map<string, { hours: number; cost: number; amount: number; name: string }>();
     const teamMap = new Map<string, { hours: number; cost: number; amount: number; name: string }>();
+    const projectNonBillable = Boolean(projectData?.non_billable);
 
     for (const e of timeEntries) {
       const consultant = consultantMap.get(e.consultant_id);
@@ -224,7 +225,7 @@ export function ReportingProjectPage() {
       const costPerHr = consultant != null ? toNum(consultant.cost_per_hour) : 0;
       const hoursRow = toNum(e.hours);
       const rowCost = hoursRow * costPerHr;
-      const amt = hoursRow * rate;
+      const amt = projectNonBillable ? 0 : hoursRow * rate;
       hours += hoursRow;
       cost += rowCost;
       amount += amt;
@@ -369,7 +370,7 @@ export function ReportingProjectPage() {
       hoursByMonthByConsultant,
       consultantListForChart,
     };
-  }, [timeEntries, consultantMap, overrideMap, activityMap, activities, phases, assignments, isWholeOfLife, consultants]);
+  }, [timeEntries, consultantMap, overrideMap, activityMap, activities, phases, assignments, isWholeOfLife, consultants, projectData]);
 
   const hoursByWeekByConsultant = useMemo(() => {
     if (isWholeOfLife) return { data: [] as Record<string, string | number>[], consultantListForWeekChart: [] as Consultant[] };
@@ -594,12 +595,13 @@ export function ReportingProjectPage() {
         </Card>
       )}
 
-      {isWholeOfLife && showRevenueAndProfit && revenueByMonth.length > 0 && (
+      {isWholeOfLife && showRevenueAndProfit && (
         <Card variant="outlined" sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
               Revenue by month (whole of life)
             </Typography>
+            {revenueByMonth.length > 0 ? (
             <Box sx={{ height: 260 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -655,6 +657,11 @@ export function ReportingProjectPage() {
                 </BarChart>
               </ResponsiveContainer>
             </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No time entries for this project yet. Log time in Timesheets to see revenue by month.
+              </Typography>
+            )}
           </CardContent>
         </Card>
       )}
