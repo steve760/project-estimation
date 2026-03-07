@@ -89,6 +89,7 @@ interface ActivityRow {
   phase_id: string;
   name: string;
   sort_order: number;
+  estimated_hours?: number;
 }
 
 interface AssignmentRow {
@@ -114,7 +115,7 @@ export function ReportingPage() {
   const theme = useTheme();
   const [searchParams] = useSearchParams();
   const clientIdFilter = searchParams.get('client') ?? null;
-  const { isAdmin, profileLoading, user } = useAuth();
+  const { isAdmin, profileLoading, user, consultantId } = useAuth();
   const monthParam = searchParams.get('month'); // YYYY-MM
   const [month, setMonth] = useState(() => {
     if (monthParam) {
@@ -203,7 +204,7 @@ export function ReportingPage() {
         return { phases: phaseList, activities: [] as ActivityRow[], assignments: [] as AssignmentRow[] };
       const { data: activities, error: e2 } = await supabase
         .from('activities')
-        .select('id, phase_id, name, sort_order')
+        .select('id, phase_id, name, sort_order, estimated_hours')
         .in('phase_id', phaseIds)
         .order('sort_order');
       if (e2) throw e2;
@@ -285,6 +286,50 @@ export function ReportingPage() {
     });
     return { data, consultantList };
   }, [timeEntries, consultants, month]);
+
+  const hoursByWeekByProject = useMemo(() => {
+    const entriesForConsultant = consultantId
+      ? timeEntries.filter((e) => e.consultant_id === consultantId)
+      : timeEntries;
+    const year = month.getFullYear();
+    const monthIdx = month.getMonth();
+    const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+    const weekLabels = ['Week 1 (1-7)', 'Week 2 (8-14)', 'Week 3 (15-21)', 'Week 4 (22-28)', 'Week 5 (29-31)'];
+    const weekRanges: [number, number][] = [
+      [1, 7],
+      [8, 14],
+      [15, 21],
+      [22, 28],
+      [29, 31],
+    ];
+    const projectIds = new Set<string>();
+    const map = new Map<string, number>();
+    for (const e of entriesForConsultant) {
+      projectIds.add(e.project_id);
+      const day = parseInt(e.entry_date.slice(8, 10), 10);
+      let weekIndex = 0;
+      for (let w = 0; w < weekRanges.length; w++) {
+        if (day >= weekRanges[w][0] && day <= Math.min(weekRanges[w][1], daysInMonth)) {
+          weekIndex = w;
+          break;
+        }
+      }
+      const key = `${weekIndex}|${e.project_id}`;
+      map.set(key, (map.get(key) ?? 0) + toNum(e.hours));
+    }
+    const projectList = projects.filter((p) => projectIds.has(p.id));
+    const data = weekRanges.map((_range, weekIndex) => {
+      const row: Record<string, string | number> = {
+        week: weekLabels[weekIndex],
+        weekIndex,
+      };
+      for (const p of projectList) {
+        row[p.id] = map.get(`${weekIndex}|${p.id}`) ?? 0;
+      }
+      return row;
+    });
+    return { data, projectList };
+  }, [timeEntries, consultantId, month, projects]);
 
   const revenueCostByWeek = useMemo(() => {
     const year = month.getFullYear();
@@ -377,7 +422,7 @@ export function ReportingPage() {
       }
     }
 
-    const { phases, activities, assignments } = taskStructure;
+    const { phases, activities } = taskStructure;
     const phaseMap = new Map(phases.map((p) => [p.id, p]));
     const activityToProject = new Map<string, string>();
     for (const a of activities) {
@@ -385,10 +430,10 @@ export function ReportingPage() {
       if (phase) activityToProject.set(a.id, phase.project_id);
     }
     const allocatedByProject = new Map<string, number>();
-    for (const a of assignments) {
-      const projectId = activityToProject.get(a.activity_id);
+    for (const a of activities) {
+      const projectId = activityToProject.get(a.id);
       if (projectId) {
-        const h = toNum(a.hours);
+        const h = toNum(a.estimated_hours ?? 0);
         allocatedByProject.set(projectId, (allocatedByProject.get(projectId) ?? 0) + h);
       }
     }
@@ -631,12 +676,66 @@ export function ReportingPage() {
               ) : (
                 <>
                   <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2 }}>
-                    Time logged by consultant
+                    {consultantId ? 'Your time by project' : 'Time logged by consultant'}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Hours per week in the selected month.
+                    {consultantId
+                      ? 'Hours per week in the selected month, by project you logged time to.'
+                      : 'Hours per week in the selected month.'}
                   </Typography>
-                  {hoursByWeekByConsultant.data.length === 0 || hoursByWeekByConsultant.consultantList.length === 0 ? (
+                  {consultantId ? (
+                    hoursByWeekByProject.data.length === 0 || hoursByWeekByProject.projectList.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary">
+                        No time logged in this month.
+                      </Typography>
+                    ) : (
+                      <Box sx={{ height: 280 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart
+                            data={hoursByWeekByProject.data}
+                            margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                            <XAxis
+                              dataKey="week"
+                              tick={{ fontSize: 11, fill: theme.palette.text.secondary }}
+                            />
+                            <YAxis
+                              tick={{ fontSize: 11, fill: theme.palette.text.secondary }}
+                              allowDecimals={false}
+                            />
+                            <Tooltip
+                              formatter={(value: number | undefined) => [Number(value ?? 0).toFixed(1), 'Hours']}
+                              contentStyle={{
+                                borderRadius: theme.shape.borderRadius,
+                                border: `1px solid ${theme.palette.divider}`,
+                              }}
+                              cursor={false}
+                            />
+                            <Legend
+                              wrapperStyle={{ fontSize: 11 }}
+                              formatter={(value) => projects.find((p) => p.id === value)?.name ?? value}
+                            />
+                            {hoursByWeekByProject.projectList.map((p, index) => {
+                              const strokeColor = [theme.palette.primary.main, theme.palette.primary.light, theme.palette.secondary.dark, theme.palette.success.main, theme.palette.error.main][index % 5];
+                              return (
+                                <Line
+                                  key={p.id}
+                                  type="monotone"
+                                  dataKey={p.id}
+                                  name={p.name}
+                                  stroke={strokeColor}
+                                  strokeWidth={2}
+                                  dot={{ r: 4 }}
+                                  connectNulls
+                                />
+                              );
+                            })}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </Box>
+                    )
+                  ) : hoursByWeekByConsultant.data.length === 0 || hoursByWeekByConsultant.consultantList.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
                       No time logged in this month.
                     </Typography>

@@ -35,25 +35,12 @@ export function TimesheetsPage() {
 
       if (!consultantId) return [];
 
-      const { data: assignments } = await supabase
-        .from('activity_assignments')
-        .select('activity_id')
+      const { data: teamRows } = await supabase
+        .from('project_consultants')
+        .select('project_id')
         .eq('consultant_id', consultantId);
-      const activityIds = [...new Set((assignments ?? []).map((a: { activity_id: string }) => a.activity_id))];
-      if (activityIds.length === 0) return [];
-
-      const { data: activities } = await supabase
-        .from('activities')
-        .select('id, phase_id')
-        .in('id', activityIds);
-      const phaseIds = [...new Set((activities ?? []).map((a: { phase_id: string }) => a.phase_id))];
-      if (phaseIds.length === 0) return [];
-
-      const { data: phases } = await supabase
-        .from('phases')
-        .select('id, project_id')
-        .in('id', phaseIds);
-      const allowedProjectIds = new Set((phases ?? []).map((p: { project_id: string }) => p.project_id));
+      const allowedProjectIds = new Set((teamRows ?? []).map((r: { project_id: string }) => r.project_id));
+      if (allowedProjectIds.size === 0) return [];
 
       return list.filter((p) => allowedProjectIds.has(p.id));
     },
@@ -67,7 +54,7 @@ export function TimesheetsPage() {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         {isAdmin
           ? 'Log time for any active project. Rows are grouped by project.'
-          : 'Log time for projects you’re allocated to. Add rows from different projects in one place.'}
+          : 'Log time for projects you’re on the team for. Add rows from any task in those projects.'}
       </Typography>
 
       {isLoading ? (
@@ -83,7 +70,7 @@ export function TimesheetsPage() {
                 ? 'Your account is not linked to a consultant. Ask an admin to link you on the Consultants page.'
                 : isAdmin
                   ? 'No active projects yet. Set a project to Active in the Projects area to log time.'
-                  : 'You’re not allocated to any active projects yet.'}
+                  : 'You’re not on any active project teams yet. Ask an admin to add you on the project’s Team tab.'}
             </Typography>
           </CardContent>
         </Card>

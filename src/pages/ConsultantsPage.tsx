@@ -239,7 +239,8 @@ export function ConsultantsPage() {
     {
       field: 'inactive',
       headerName: 'Active',
-      width: 80,
+      flex: 1,
+      minWidth: 80,
       sortable: false,
       renderCell: ({ row }) => (
         <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', alignItems: 'center' }}>
@@ -266,7 +267,7 @@ export function ConsultantsPage() {
       field: 'name',
       headerName: 'Name',
       flex: 1,
-      minWidth: 180,
+      minWidth: 120,
       renderCell: ({ row }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Avatar
@@ -287,7 +288,8 @@ export function ConsultantsPage() {
           {
             field: 'role',
             headerName: 'Role',
-            width: 120,
+            flex: 1,
+            minWidth: 100,
             sortable: true,
             align: 'center' as const,
             headerAlign: 'center' as const,
@@ -315,7 +317,8 @@ export function ConsultantsPage() {
           {
             field: 'cost_per_hour',
             headerName: 'Cost/hour',
-            width: 120,
+            flex: 1,
+            minWidth: 100,
             type: 'number' as const,
             valueGetter: (value: unknown) => (value != null && value !== '' ? Number(value) : 0),
             valueFormatter: (v: unknown) => (v != null && v !== '' ? `$${Number(v).toFixed(2)}` : '$0.00'),
@@ -323,7 +326,8 @@ export function ConsultantsPage() {
           {
             field: 'charge_out_rate',
             headerName: 'Charge out/hour',
-            width: 140,
+            flex: 1,
+            minWidth: 120,
             type: 'number' as const,
             valueGetter: (value: unknown) => (value != null && value !== '' ? Number(value) : 0),
             valueFormatter: (v: unknown) => (v != null && v !== '' ? `$${Number(v).toFixed(2)}` : '$0.00'),
@@ -331,7 +335,8 @@ export function ConsultantsPage() {
           {
             field: 'user_id',
             headerName: 'Linked user',
-            width: 220,
+            flex: 1,
+            minWidth: 160,
             sortable: false,
             valueGetter: (_value: unknown, row: Consultant) => row.user_id ?? '',
             renderCell: ({ row }: { row: Consultant }) => (
@@ -366,7 +371,8 @@ export function ConsultantsPage() {
     {
       field: 'actions',
       headerName: '',
-      width: 80,
+      flex: 1,
+      minWidth: 80,
       sortable: false,
       renderCell: ({ row }) => (
         <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'inline-block' }}>

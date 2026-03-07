@@ -66,7 +66,7 @@ function toDateString(d: Date): string {
 export function ReportingProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [searchParams] = useSearchParams();
-  const { isAdmin, profileLoading } = useAuth();
+  const { isAdmin, profileLoading, consultantId } = useAuth();
   const theme = useTheme();
   const monthParam = searchParams.get('month'); // YYYY-MM
   const [month, setMonth] = useState(() => {
@@ -205,9 +205,9 @@ export function ReportingProjectPage() {
     consultantListForChart,
   } = useMemo(() => {
     const allocatedByActivity = new Map<string, number>();
-    for (const a of assignments) {
-      const id = a.activity_id;
-      allocatedByActivity.set(id, (allocatedByActivity.get(id) ?? 0) + toNum(a.hours));
+    for (const a of activities) {
+      const hours = toNum((a as Activity & { estimated_hours?: number }).estimated_hours ?? 0);
+      allocatedByActivity.set(a.id, hours);
     }
 
     let hours = 0;
@@ -370,7 +370,7 @@ export function ReportingProjectPage() {
       hoursByMonthByConsultant,
       consultantListForChart,
     };
-  }, [timeEntries, consultantMap, overrideMap, activityMap, activities, phases, assignments, isWholeOfLife, consultants, projectData]);
+  }, [timeEntries, consultantMap, overrideMap, activityMap, activities, phases, isWholeOfLife, consultants, projectData]);
 
   const hoursByWeekByConsultant = useMemo(() => {
     if (isWholeOfLife) return { data: [] as Record<string, string | number>[], consultantListForWeekChart: [] as Consultant[] };
@@ -409,6 +409,34 @@ export function ReportingProjectPage() {
     });
     return { data, consultantListForWeekChart };
   }, [timeEntries, month, consultants, isWholeOfLife]);
+
+  const myHoursByWeek = useMemo(() => {
+    if (isWholeOfLife || !consultantId) return { data: [] as { week: string; hours: number }[] };
+    const year = month.getFullYear();
+    const monthIdx = month.getMonth();
+    const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+    const weekLabels = ['Week 1 (1-7)', 'Week 2 (8-14)', 'Week 3 (15-21)', 'Week 4 (22-28)', 'Week 5 (29-31)'];
+    const weekRanges: [number, number][] = [
+      [1, 7],
+      [8, 14],
+      [15, 21],
+      [22, 28],
+      [29, 31],
+    ];
+    const byWeek = [0, 0, 0, 0, 0];
+    for (const e of timeEntries) {
+      if (e.consultant_id !== consultantId) continue;
+      const day = parseInt(e.entry_date.slice(8, 10), 10);
+      for (let w = 0; w < weekRanges.length; w++) {
+        if (day >= weekRanges[w][0] && day <= Math.min(weekRanges[w][1], daysInMonth)) {
+          byWeek[w] += toNum(e.hours);
+          break;
+        }
+      }
+    }
+    const data = weekRanges.map((range, i) => ({ week: weekLabels[i], hours: byWeek[i] }));
+    return { data };
+  }, [timeEntries, month, consultantId, isWholeOfLife]);
 
   const [tab, setTab] = useState(0);
 
@@ -484,20 +512,6 @@ export function ReportingProjectPage() {
             <Typography variant="h6">{(toNum(totalHours)).toFixed(2)}</Typography>
           </CardContent>
         </Card>
-        <Card
-          variant="outlined"
-          sx={{
-            minWidth: 140,
-            ...(toNum(remainingHours) < 0 && { borderColor: 'error.main' }),
-          }}
-        >
-          <CardContent>
-            <Typography variant="body2" color="text.secondary">Remaining hours</Typography>
-            <Typography variant="h6">
-              {(toNum(remainingHours)).toFixed(2)}
-            </Typography>
-          </CardContent>
-        </Card>
         {showFinancials && (
           <>
             <Card variant="outlined" sx={{ minWidth: 140 }}>
@@ -539,6 +553,46 @@ export function ReportingProjectPage() {
           </>
         )}
       </Box>
+
+      {viewMode === 'monthly' && !isAdmin && consultantId && myHoursByWeek.data.length > 0 && (
+        <Card variant="outlined" sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
+              Your hours by week
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Hours you logged per week in the selected month.
+            </Typography>
+            <Box sx={{ height: 260 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={myHoursByWeek.data}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                  <XAxis
+                    dataKey="week"
+                    tick={{ fontSize: 11, fill: theme.palette.text.secondary }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: theme.palette.text.secondary }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    formatter={(value: number | undefined) => [toNum(value ?? 0).toFixed(1), 'Hours']}
+                    contentStyle={{
+                      borderRadius: theme.shape.borderRadius,
+                      border: `1px solid ${theme.palette.divider}`,
+                    }}
+                    cursor={false}
+                  />
+                  <Bar dataKey="hours" name="Hours" fill={theme.palette.primary.main} />
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
 
       {viewMode === 'monthly' && isAdmin && hoursByWeekByConsultant.data.length > 0 && hoursByWeekByConsultant.consultantListForWeekChart.length > 0 && (
         <Card variant="outlined" sx={{ mb: 3 }}>
@@ -744,13 +798,19 @@ export function ReportingProjectPage() {
                       <TableRow>
                         <TableCell sx={{ fontWeight: 700 }}>Phase</TableCell>
                         <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700 }}>Allocated</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700 }}>Logged</TableCell>
-                        {isWholeOfLife && (
-                          <TableCell align="right" sx={{ fontWeight: 700 }}>Hours left</TableCell>
+                        {!nonBillable && (
+                          <TableCell align="right" sx={{ fontWeight: 700 }}>Allocated</TableCell>
                         )}
-                        {!isWholeOfLife && (
-                          <TableCell align="right" sx={{ fontWeight: 700 }}>Remaining hours</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>Logged</TableCell>
+                        {!nonBillable && (
+                          <>
+                            {isWholeOfLife && (
+                              <TableCell align="right" sx={{ fontWeight: 700 }}>Hours left</TableCell>
+                            )}
+                            {!isWholeOfLife && (
+                              <TableCell align="right" sx={{ fontWeight: 700 }}>Remaining hours</TableCell>
+                            )}
+                          </>
                         )}
                         {showFinancials && (
                           <>
@@ -778,45 +838,51 @@ export function ReportingProjectPage() {
                           <TableRow key={row.activityId}>
                             <TableCell sx={isFirstPhaseInGroup ? { fontWeight: 700 } : undefined}>{row.phaseName}</TableCell>
                             <TableCell>{row.name}</TableCell>
-                            <TableCell align="right">{allocated.toFixed(2)}</TableCell>
-                            <TableCell align="right">{logged.toFixed(2)}</TableCell>
-                            {isWholeOfLife && (
-                              <TableCell
-                                align="right"
-                                sx={{ color: residual < 0 ? 'error.main' : undefined, minWidth: 180 }}
-                              >
-                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
-                                  <Typography variant="body2" component="div">
-                                    {residual.toFixed(2)}
-                                  </Typography>
-                                  <Box
-                                    sx={{
-                                      width: 120,
-                                      height: 6,
-                                      borderRadius: 999,
-                                      bgcolor: 'grey.200',
-                                      overflow: 'hidden',
-                                    }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        width: `${usedPct}%`,
-                                        height: '100%',
-                                        bgcolor: residual < 0 ? 'error.main' : 'primary.main',
-                                        transition: 'width 0.2s ease-out',
-                                      }}
-                                    />
-                                  </Box>
-                                </Box>
-                              </TableCell>
+                            {!nonBillable && (
+                              <TableCell align="right">{allocated.toFixed(2)}</TableCell>
                             )}
-                            {!isWholeOfLife && (
-                              <TableCell
-                                align="right"
-                                sx={{ color: residual < 0 ? 'error.main' : undefined }}
-                              >
-                                {residual.toFixed(2)}
-                              </TableCell>
+                            <TableCell align="right">{logged.toFixed(2)}</TableCell>
+                            {!nonBillable && (
+                              <>
+                                {isWholeOfLife && (
+                                  <TableCell
+                                    align="right"
+                                    sx={{ color: residual < 0 ? 'error.main' : undefined, minWidth: 180 }}
+                                  >
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
+                                      <Typography variant="body2" component="div">
+                                        {residual.toFixed(2)}
+                                      </Typography>
+                                      <Box
+                                        sx={{
+                                          width: 120,
+                                          height: 6,
+                                          borderRadius: 999,
+                                          bgcolor: 'grey.200',
+                                          overflow: 'hidden',
+                                        }}
+                                      >
+                                        <Box
+                                          sx={{
+                                            width: `${usedPct}%`,
+                                            height: '100%',
+                                            bgcolor: residual < 0 ? 'error.main' : 'primary.main',
+                                            transition: 'width 0.2s ease-out',
+                                          }}
+                                        />
+                                      </Box>
+                                    </Box>
+                                  </TableCell>
+                                )}
+                                {!isWholeOfLife && (
+                                  <TableCell
+                                    align="right"
+                                    sx={{ color: residual < 0 ? 'error.main' : undefined }}
+                                  >
+                                    {residual.toFixed(2)}
+                                  </TableCell>
+                                )}
+                              </>
                             )}
                             {showFinancials && (
                               <>
@@ -851,21 +917,27 @@ export function ReportingProjectPage() {
                         <TableRow sx={{ fontWeight: 700, bgcolor: 'grey.50', '& .MuiTableCell-root': { fontWeight: 700 } }}>
                           <TableCell />
                           <TableCell>Total</TableCell>
-                          <TableCell align="right">
-                            {byTask.reduce((s, r) => s + toNum(r.allocated), 0).toFixed(2)}
-                          </TableCell>
-                          <TableCell align="right">{toNum(totalHours).toFixed(2)}</TableCell>
-                          {isWholeOfLife && (
+                          {!nonBillable && (
                             <TableCell align="right">
-                              {(
-                                byTask.reduce((s, r) => s + toNum(r.allocated), 0) - toNum(totalHours)
-                              ).toFixed(2)}
+                              {byTask.reduce((s, r) => s + toNum(r.allocated), 0).toFixed(2)}
                             </TableCell>
                           )}
-                          {!isWholeOfLife && (
-                            <TableCell align="right" sx={{ color: toNum(remainingHours) < 0 ? 'error.main' : undefined }}>
-                              {toNum(remainingHours).toFixed(2)}
-                            </TableCell>
+                          <TableCell align="right">{toNum(totalHours).toFixed(2)}</TableCell>
+                          {!nonBillable && (
+                            <>
+                              {isWholeOfLife && (
+                                <TableCell align="right">
+                                  {(
+                                    byTask.reduce((s, r) => s + toNum(r.allocated), 0) - toNum(totalHours)
+                                  ).toFixed(2)}
+                                </TableCell>
+                              )}
+                              {!isWholeOfLife && (
+                                <TableCell align="right" sx={{ color: toNum(remainingHours) < 0 ? 'error.main' : undefined }}>
+                                  {toNum(remainingHours).toFixed(2)}
+                                </TableCell>
+                              )}
+                            </>
                           )}
                           {showFinancials && (
                             <>

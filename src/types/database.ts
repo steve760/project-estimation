@@ -54,6 +54,10 @@ export interface Activity {
   phase_id: string;
   name: string;
   sort_order: number;
+  /** Estimated hours for this task. */
+  estimated_hours?: number;
+  /** Default charge-out rate ($/hr) for this task. Budget = default_rate × estimated_hours. */
+  default_rate?: number | null;
   created_at: string;
   updated_at: string;
 }

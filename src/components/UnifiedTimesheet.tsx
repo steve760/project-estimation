@@ -319,8 +319,10 @@ export function UnifiedTimesheet({ projects, consultantId, isAdmin }: UnifiedTim
         }
       }
     }
-    saveTimeEntriesMutation.mutate(entries);
-  }, [effectiveConsultantId, rowsByProject, weekStart, gridState, saveTimeEntriesMutation]);
+    const allowedProjectIds = new Set(projectIds);
+    const entriesToSave = isAdmin ? entries : entries.filter((e) => allowedProjectIds.has(e.project_id));
+    saveTimeEntriesMutation.mutate(entriesToSave);
+  }, [effectiveConsultantId, rowsByProject, weekStart, gridState, saveTimeEntriesMutation, isAdmin, projectIds]);
 
   const saveRef = useRef(handleSave);
   saveRef.current = handleSave;
