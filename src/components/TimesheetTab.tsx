@@ -201,7 +201,11 @@ export function TimesheetTab({
         if (state[r.activityId][key] === undefined) state[r.activityId][key] = gridHours[r.activityId]?.[key] ?? 0;
       }
     }
-    return { ...state, ...gridHours };
+    const merged = { ...state };
+    for (const activityId of Object.keys(gridHours)) {
+      merged[activityId] = { ...(merged[activityId] ?? {}), ...gridHours[activityId] };
+    }
+    return merged;
   }, [timeEntries, rows, weekStart, gridHours]);
 
   const setCellHours = useCallback((activityId: string, dateStr: string, value: number) => {

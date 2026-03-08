@@ -264,7 +264,11 @@ export function UnifiedTimesheet({ projects, consultantId, isAdmin }: UnifiedTim
         }
       }
     }
-    return { ...state, ...gridHours };
+    const merged = { ...state };
+    for (const key of Object.keys(gridHours)) {
+      merged[key] = { ...(merged[key] ?? {}), ...gridHours[key] };
+    }
+    return merged;
   }, [timeEntries, rowsByProject, weekStart, gridHours]);
 
   const setCellHours = useCallback((projectId: string, activityId: string, dateStr: string, value: number) => {
