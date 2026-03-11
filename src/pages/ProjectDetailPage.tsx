@@ -26,6 +26,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
+  Divider,
   DialogActions,
   Tooltip,
   Chip,
@@ -1434,21 +1435,33 @@ export function ProjectDetailPage() {
         fullWidth
       >
         <DialogTitle>Edit task</DialogTitle>
-        <DialogContent sx={{ pt: 2, '& .MuiFormControl-root': { marginBottom: 2 } }}>
+        <Divider />
+        <DialogContent sx={{ pt: 4, '& .MuiFormControl-root': { marginBottom: 2 } }}>
           <Autocomplete
             size="small"
+            freeSolo
             options={phases}
-            getOptionLabel={(p) => p.name}
-            value={phases.find((p) => p.id === taskToEdit?.phaseId) ?? null}
-            onChange={(_, value) => setTaskToEdit((a) => (a && value ? { ...a, phaseId: value.id, phaseName: value.name } : a))}
-            renderInput={(params) => <TextField {...params} label="Phase" />}
-          />
-          <TextField
-            fullWidth
-            label="Phase name"
-            value={taskToEdit?.phaseName ?? ''}
-            onChange={(e) => setTaskToEdit((a) => (a ? { ...a, phaseName: e.target.value } : null))}
-            placeholder="Name of this phase"
+            getOptionLabel={(p) => (typeof p === 'string' ? p : p.name)}
+            value={phases.find((p) => p.id === taskToEdit?.phaseId && p.name === taskToEdit?.phaseName) ?? null}
+            inputValue={taskToEdit?.phaseName ?? ''}
+            onInputChange={(_, v) =>
+              setTaskToEdit((a) =>
+                a
+                  ? {
+                      ...a,
+                      phaseName: v ?? '',
+                      phaseId: phases.find((p) => p.name === (v ?? '').trim())?.id ?? a.phaseId,
+                    }
+                  : null
+              )
+            }
+            onChange={(_, value) => {
+              const phase = value != null && typeof value !== 'string' ? value : null;
+              if (phase) setTaskToEdit((a) => (a ? { ...a, phaseId: phase.id, phaseName: phase.name } : null));
+            }}
+            renderInput={(params) => (
+              <TextField {...params} label="Phase" placeholder="Select or type a phase name" />
+            )}
           />
           <TextField
             fullWidth
@@ -1501,16 +1514,23 @@ export function ProjectDetailPage() {
               variant="contained"
               onClick={async () => {
                 if (!taskToEdit) return;
-                const currentPhase = phases.find((p) => p.id === taskToEdit.phaseId);
                 const phaseNameTrim = taskToEdit.phaseName.trim();
-                if (currentPhase && phaseNameTrim && phaseNameTrim !== currentPhase.name) {
-                  await updatePhaseMutation.mutateAsync({ id: taskToEdit.phaseId, name: phaseNameTrim });
+                let phaseId = taskToEdit.phaseId;
+                const existingByName = phases.find((p) => p.name.trim().toLowerCase() === phaseNameTrim.toLowerCase());
+                if (existingByName) {
+                  phaseId = existingByName.id;
+                  if (existingByName.name !== phaseNameTrim) {
+                    await updatePhaseMutation.mutateAsync({ id: existingByName.id, name: phaseNameTrim });
+                  }
+                } else if (phaseNameTrim) {
+                  const created = await createPhaseMutation.mutateAsync({ project_id: projectId!, name: phaseNameTrim });
+                  phaseId = created.id;
                 }
                 updateActivityMutation.mutate(
                   {
                     id: taskToEdit.activityId,
                     name: taskToEdit.activityName.trim(),
-                    phase_id: taskToEdit.phaseId,
+                    phase_id: phaseId,
                     estimated_hours: nonBillable ? 0 : taskToEdit.estimatedHours,
                     default_rate: taskToEdit.defaultRate ?? null,
                   },
