@@ -1429,8 +1429,8 @@ export function ProjectDetailPage() {
             freeSolo
             options={phases}
             getOptionLabel={(p) => (typeof p === 'string' ? p : p.name)}
-            value={phases.find((p) => p.id === taskToEdit?.phaseId && p.name === taskToEdit?.phaseName) ?? null}
-            inputValue={taskToEdit?.phaseName ?? ''}
+            value={phases.find((p) => p.id === taskToEdit?.phaseId) ?? null}
+            inputValue={phases.find((p) => p.id === taskToEdit?.phaseId)?.name ?? taskToEdit?.phaseName ?? ''}
             onInputChange={(_, v) =>
               setTaskToEdit((a) =>
                 a
@@ -1501,7 +1501,7 @@ export function ProjectDetailPage() {
               variant="contained"
               onClick={async () => {
                 if (!taskToEdit) return;
-                const phaseNameTrim = taskToEdit.phaseName.trim();
+                const phaseNameTrim = (phases.find((p) => p.id === taskToEdit.phaseId)?.name ?? taskToEdit.phaseName).trim();
                 let phaseId = taskToEdit.phaseId;
                 const existingByName = phases.find((p) => p.name.trim().toLowerCase() === phaseNameTrim.toLowerCase());
                 if (existingByName) {
