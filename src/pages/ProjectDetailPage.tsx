@@ -205,6 +205,24 @@ function buildTaskRows(project: { phases?: PhaseWithActivitiesDisplay[]; non_bil
   return rows;
 }
 
+/**
+ * Normalize rate vs row total: if the stored value looks like a row total (large and
+ * equals hours × plausible $/hr), use it as row budget and derive $/hr for display.
+ * This fixes cases where "Default rate ($/hr)" was given the row total by mistake.
+ */
+function getDisplayRateAndRowBudget(
+  hours: number,
+  rate: number | null | undefined
+): { displayRate: number; rowBudget: number } {
+  const r = rate != null && !Number.isNaN(Number(rate)) && Number(rate) >= 0 ? Number(rate) : 0;
+  if (hours <= 0) return { displayRate: r, rowBudget: 0 };
+  if (r >= 1000) {
+    const quotient = r / hours;
+    if (quotient >= 50 && quotient <= 5000) return { displayRate: quotient, rowBudget: r };
+  }
+  return { displayRate: r, rowBudget: hours * r };
+}
+
 function flattenProjectToRows(project: { phases?: PhaseWithActivitiesDisplay[] }): FlatRow[] {
   const rows: FlatRow[] = [];
   for (const phase of project.phases ?? []) {
@@ -480,13 +498,19 @@ function SortableTaskRow({
           {task.estimatedHours > 0 ? task.estimatedHours : '—'}
         </TableCell>
       )}
-      {showHours && (
-        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 90 }}>
-          {task.defaultRate != null && !Number.isNaN(Number(task.defaultRate)) && Number(task.defaultRate) >= 0
-            ? `$${Number(task.defaultRate).toFixed(2)}`
-            : '—'}
-        </TableCell>
-      )}
+      {showHours && (() => {
+        const { displayRate, rowBudget } = getDisplayRateAndRowBudget(task.estimatedHours, task.defaultRate);
+        return (
+          <>
+            <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 90 }}>
+              {displayRate > 0 ? `$${displayRate.toFixed(2)}` : '—'}
+            </TableCell>
+            <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 100 }}>
+              {rowBudget > 0 ? `$${rowBudget.toFixed(2)}` : '—'}
+            </TableCell>
+          </>
+        );
+      })()}
       <TableCell sx={{ width: 221 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <IconButton size="small" onClick={() => onEdit(task)} title="Edit activity" sx={{ p: 0.75 }}>
@@ -1054,8 +1078,8 @@ export function ProjectDetailPage() {
       for (const activity of phase.activities ?? []) {
         const act = activity as Activity & { estimated_hours?: number; default_rate?: number | null };
         const hours = Number(act.estimated_hours) || 0;
-        const rate = act.default_rate != null && !Number.isNaN(Number(act.default_rate)) && Number(act.default_rate) >= 0 ? Number(act.default_rate) : 0;
-        sum += hours * rate;
+        const { rowBudget } = getDisplayRateAndRowBudget(hours, act.default_rate);
+        sum += rowBudget;
       }
     }
     return sum;
@@ -1606,7 +1630,10 @@ export function ProjectDetailPage() {
                   <TableCell align="right" sx={{ fontWeight: 700, width: 162, pl: 1 }}>Hours</TableCell>
                 )}
                 {!nonBillable && (
-                  <TableCell align="right" sx={{ fontWeight: 700, width: 90 }}>Rate</TableCell>
+                  <>
+                    <TableCell align="right" sx={{ fontWeight: 700, width: 90 }}>Rate ($/hr)</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, width: 100 }}>Budget</TableCell>
+                  </>
                 )}
                 <TableCell sx={{ fontWeight: 700, width: 221 }}>Actions</TableCell>
               </TableRow>
@@ -1639,10 +1666,11 @@ export function ProjectDetailPage() {
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 162, pl: 1 }}>
                         {taskRows.reduce((s, t) => s + t.estimatedHours, 0).toFixed(2)}
                       </TableCell>
-                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 90 }}>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 90 }}>—</TableCell>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 100 }}>
                         {(() => {
                           const totalBudget = taskRows.reduce(
-                            (s, t) => s + t.estimatedHours * (t.defaultRate != null && Number(t.defaultRate) >= 0 ? Number(t.defaultRate) : 0),
+                            (s, t) => s + getDisplayRateAndRowBudget(t.estimatedHours, t.defaultRate).rowBudget,
                             0
                           );
                           return totalBudget > 0 ? `$${totalBudget.toFixed(2)}` : '—';
@@ -1655,7 +1683,7 @@ export function ProjectDetailPage() {
               )}
               {addRowError && (
                 <TableRow>
-                  <TableCell colSpan={nonBillable ? 4 : 6} sx={{ py: 1, verticalAlign: 'middle' }}>
+                  <TableCell colSpan={nonBillable ? 4 : 7} sx={{ py: 1, verticalAlign: 'middle' }}>
                     <Alert severity="error" onClose={() => setAddRowError(null)}>
                       {addRowError}
                     </Alert>
@@ -1664,7 +1692,7 @@ export function ProjectDetailPage() {
               )}
               {duplicateError && (
                 <TableRow>
-                  <TableCell colSpan={nonBillable ? 4 : 6} sx={{ py: 1, verticalAlign: 'middle' }}>
+                  <TableCell colSpan={nonBillable ? 4 : 7} sx={{ py: 1, verticalAlign: 'middle' }}>
                     <Alert severity="error" onClose={() => setDuplicateError(null)}>
                       {duplicateError}
                     </Alert>
