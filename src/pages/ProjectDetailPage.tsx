@@ -57,6 +57,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Project, Phase, Activity, ActivityAssignment, Consultant, PhaseWithActivitiesDisplay, ActivityWithAssignmentsDisplay } from '../types/database';
 import type { ProjectConsultantRate } from '../types/database';
 import { computeFinancialSummary, formatCurrency, getDisplayRateAndRowBudget, roundCurrency } from '../lib/calculations';
+import { buildTaskListCopyContent } from '../lib/taskListCopy';
 
 function getInitials(name: string): string {
   return name
@@ -1197,13 +1198,7 @@ export function ProjectDetailPage() {
   };
 
   const handleCopyTableToWord = async () => {
-    const headers = ['Phase', 'Activity', 'Hours'];
-    const headerRow = '<tr>' + headers.map((h) => `<th>${h}</th>`).join('') + '</tr>';
-    const dataRows = taskRows
-      .map((task) => `<tr><td>${task.phaseName}</td><td>${task.activityName}</td><td>${task.estimatedHours > 0 ? task.estimatedHours : ''}</td></tr>`)
-      .join('');
-    const html = `<table border="1" cellpadding="4" cellspacing="0"><thead>${headerRow}</thead><tbody>${dataRows}</tbody></table>`;
-    const plain = [headers.join('\t'), ...taskRows.map((t) => [t.phaseName, t.activityName, t.estimatedHours > 0 ? t.estimatedHours : ''].join('\t'))].join('\n');
+    const { plain, html } = buildTaskListCopyContent(taskRows);
     await navigator.clipboard.write([
       new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) }),
     ]);
@@ -1501,17 +1496,26 @@ export function ProjectDetailPage() {
               variant="contained"
               onClick={async () => {
                 if (!taskToEdit) return;
-                const phaseNameTrim = (phases.find((p) => p.id === taskToEdit.phaseId)?.name ?? taskToEdit.phaseName).trim();
+                const phaseNameTrim = taskToEdit.phaseName.trim();
+                const currentPhase = phases.find((p) => p.id === taskToEdit.phaseId);
                 let phaseId = taskToEdit.phaseId;
-                const existingByName = phases.find((p) => p.name.trim().toLowerCase() === phaseNameTrim.toLowerCase());
-                if (existingByName) {
-                  phaseId = existingByName.id;
-                  if (existingByName.name !== phaseNameTrim) {
-                    await updatePhaseMutation.mutateAsync({ id: existingByName.id, name: phaseNameTrim });
+                // Editing an existing task: always update the existing phase's name if changed; never create a new phase
+                if (currentPhase) {
+                  if (phaseNameTrim && currentPhase.name.trim() !== phaseNameTrim) {
+                    await updatePhaseMutation.mutateAsync({ id: taskToEdit.phaseId, name: phaseNameTrim });
                   }
                 } else if (phaseNameTrim) {
-                  const created = await createPhaseMutation.mutateAsync({ project_id: projectId!, name: phaseNameTrim });
-                  phaseId = created.id;
+                  // No current phase (shouldn't happen in Edit task): match by name or create
+                  const existingByName = phases.find((p) => p.name.trim().toLowerCase() === phaseNameTrim.toLowerCase());
+                  if (existingByName) {
+                    phaseId = existingByName.id;
+                    if (existingByName.name !== phaseNameTrim) {
+                      await updatePhaseMutation.mutateAsync({ id: existingByName.id, name: phaseNameTrim });
+                    }
+                  } else {
+                    const created = await createPhaseMutation.mutateAsync({ project_id: projectId!, name: phaseNameTrim });
+                    phaseId = created.id;
+                  }
                 }
                 updateActivityMutation.mutate(
                   {
