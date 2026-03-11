@@ -320,7 +320,7 @@ export function ReportingProjectPage() {
         });
         const revenue = v.revenue;
         const costVal = v.cost;
-        const margin = Math.max(revenue - costVal, 0);
+        const margin = revenue - costVal;
         return {
           month: monthKey,
           label,

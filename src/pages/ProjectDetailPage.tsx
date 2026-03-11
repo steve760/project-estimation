@@ -56,7 +56,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Project, Phase, Activity, ActivityAssignment, Consultant, PhaseWithActivitiesDisplay, ActivityWithAssignmentsDisplay } from '../types/database';
 import type { ProjectConsultantRate } from '../types/database';
-import { computeFinancialSummary, formatCurrency, roundCurrency } from '../lib/calculations';
+import { computeFinancialSummary, formatCurrency, getDisplayRateAndRowBudget, roundCurrency } from '../lib/calculations';
 
 function getInitials(name: string): string {
   return name
@@ -204,24 +204,6 @@ function buildTaskRows(project: { phases?: PhaseWithActivitiesDisplay[]; non_bil
   }
   rows.sort((a, b) => a.phaseSortOrder - b.phaseSortOrder || a.activitySortOrder - b.activitySortOrder);
   return rows;
-}
-
-/**
- * Normalize rate vs row total: if the stored value looks like a row total (large and
- * equals hours × plausible $/hr), use it as row budget and derive $/hr for display.
- * This fixes cases where "Default rate ($/hr)" was given the row total by mistake.
- */
-function getDisplayRateAndRowBudget(
-  hours: number,
-  rate: number | null | undefined
-): { displayRate: number; rowBudget: number } {
-  const r = rate != null && !Number.isNaN(Number(rate)) && Number(rate) >= 0 ? Number(rate) : 0;
-  if (hours <= 0) return { displayRate: r, rowBudget: 0 };
-  if (r >= 1000) {
-    const quotient = r / hours;
-    if (quotient >= 50 && quotient <= 5000) return { displayRate: quotient, rowBudget: r };
-  }
-  return { displayRate: r, rowBudget: hours * r };
 }
 
 function flattenProjectToRows(project: { phases?: PhaseWithActivitiesDisplay[] }): FlatRow[] {
@@ -1436,7 +1418,7 @@ export function ProjectDetailPage() {
       >
         <DialogTitle>Edit task</DialogTitle>
         <Divider />
-        <DialogContent sx={{ pt: 4, '& .MuiFormControl-root': { marginBottom: 2 } }}>
+        <DialogContent sx={{ pt: 8, '& .MuiFormControl-root': { marginBottom: 2 } }}>
           <Autocomplete
             size="small"
             freeSolo

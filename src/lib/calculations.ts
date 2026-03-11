@@ -41,5 +41,24 @@ export function roundCurrency(value: number): number {
 
 /** Format a number as currency with thousands separators, e.g. $1,200.00 */
 export function formatCurrency(value: number): string {
-  return '$' + Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const n = Number(value);
+  const safe = Number.isNaN(n) ? 0 : n;
+  return '$' + safe.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * Normalize rate vs row total: if the stored value looks like a row total (large and
+ * equals hours × plausible $/hr), use it as row budget and derive $/hr for display.
+ */
+export function getDisplayRateAndRowBudget(
+  hours: number,
+  rate: number | null | undefined
+): { displayRate: number; rowBudget: number } {
+  const r = rate != null && !Number.isNaN(Number(rate)) && Number(rate) >= 0 ? Number(rate) : 0;
+  if (hours <= 0) return { displayRate: r, rowBudget: 0 };
+  if (r >= 1000) {
+    const quotient = r / hours;
+    if (quotient >= 50 && quotient <= 5000) return { displayRate: quotient, rowBudget: r };
+  }
+  return { displayRate: r, rowBudget: hours * r };
 }
