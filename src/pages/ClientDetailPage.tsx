@@ -32,7 +32,7 @@ import type {
   PhaseWithActivitiesDisplay,
   ActivityWithAssignmentsDisplay,
 } from '../types/database';
-import { computeFinancialSummary, formatCurrency, roundCurrency } from '../lib/calculations';
+import { computeFinancialSummary, formatCurrency, getDisplayRateAndRowBudget, roundCurrency } from '../lib/calculations';
 
 const projectSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -217,13 +217,33 @@ export function ClientDetailPage() {
           for (const phase of project.phases ?? []) {
             for (const activity of phase.activities ?? []) {
               for (const a of activity.assignments ?? []) {
-                if (a.consultant) projectAssignments.push({ hours: a.hours, consultant: a.consultant });
+                if (a.consultant)
+                  projectAssignments.push({ hours: Number(a.hours) || 0, consultant: a.consultant });
               }
             }
           }
-          const summary = computeFinancialSummary(projectAssignments);
-          const grossProfit = summary.profit;
-          const marginPercent = summary.marginPercent;
+          const assignmentSummary = computeFinancialSummary(projectAssignments);
+          const nonBillable = Boolean(project.non_billable);
+          let revenue = assignmentSummary.revenue;
+          let cost = assignmentSummary.cost;
+          if (!nonBillable) {
+            const revenueFromTaskRates = (() => {
+              let sum = 0;
+              for (const phase of project.phases ?? []) {
+                for (const act of phase.activities ?? []) {
+                  const a = act as Activity & { estimated_hours?: number; default_rate?: number | null };
+                  const hours = Number(a.estimated_hours) || 0;
+                  const { rowBudget } = getDisplayRateAndRowBudget(hours, a.default_rate);
+                  sum += rowBudget;
+                }
+              }
+              return sum;
+            })();
+            if (revenueFromTaskRates > 0) revenue = revenueFromTaskRates;
+          }
+          const grossProfit = revenue - cost;
+          const marginPercent = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+          const summary = { cost, revenue, profit: grossProfit, marginPercent };
           const uniqueConsultants = [...new Map(projectAssignments.map((p) => [p.consultant.id, p.consultant])).values()];
 
           return (
