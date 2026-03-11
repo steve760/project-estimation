@@ -336,7 +336,7 @@ function _SortableActivityGroupRow({
       <TableCell sx={{ width: 40, p: 0.5, cursor: isDragging ? 'grabbing' : 'grab' }} {...listeners} {...attributes}>
         <DragIcon fontSize="small" color="action" />
       </TableCell>
-      <TableCell sx={isFirstInPhase ? { fontWeight: 700 } : undefined}>{group.phaseName}</TableCell>
+      <TableCell sx={isFirstInPhase ? { fontWeight: 700 } : undefined}>{isFirstInPhase ? group.phaseName : ''}</TableCell>
       <TableCell>{group.activityName}</TableCell>
       <TableCell>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
@@ -474,7 +474,7 @@ function SortableTaskRow({
       <TableCell sx={{ width: 90, p: 0.5, cursor: isDragging ? 'grabbing' : 'grab' }} {...listeners} {...attributes}>
         <DragIcon fontSize="small" color="action" />
       </TableCell>
-      <TableCell sx={{ width: 277, ...(isFirstInPhase ? { fontWeight: 700 } : {}) }}>{task.phaseName}</TableCell>
+      <TableCell sx={{ width: 277, ...(isFirstInPhase ? { fontWeight: 700 } : {}) }}>{isFirstInPhase ? task.phaseName : ''}</TableCell>
       <TableCell sx={{ width: 403 }}>{task.activityName}</TableCell>
       {showHours && (
         <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 162, pl: 1 }}>
@@ -1389,7 +1389,10 @@ export function ProjectDetailPage() {
         onClose={() => !deleteProjectMutation.isPending && setDeleteProjectConfirmOpen(false)}
         aria-labelledby="delete-project-dialog-title"
       >
-        <DialogTitle id="delete-project-dialog-title">Delete project?</DialogTitle>
+        <Box sx={{ bgcolor: 'grey.50' }}>
+          <DialogTitle id="delete-project-dialog-title">Delete project?</DialogTitle>
+        </Box>
+        <Divider />
         <DialogContent sx={{ pt: 4 }}>
           <DialogContentText>
             This will permanently delete the project &quot;{loadedProject.name}&quot; and all its phases, activities and assignments. This cannot be undone.
@@ -1416,7 +1419,9 @@ export function ProjectDetailPage() {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Edit task</DialogTitle>
+        <Box sx={{ bgcolor: 'grey.50' }}>
+          <DialogTitle>Edit task</DialogTitle>
+        </Box>
         <Divider />
         <DialogContent sx={{ pt: 8, '& .MuiFormControl-root': { marginBottom: 2 } }}>
           <Autocomplete

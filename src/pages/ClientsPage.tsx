@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Divider,
   TextField,
   Avatar,
   IconButton,
@@ -305,7 +306,10 @@ export function ClientsPage() {
       </Card>
 
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingId ? 'Edit client' : 'New client'}</DialogTitle>
+        <Box sx={{ bgcolor: 'grey.50' }}>
+          <DialogTitle>{editingId ? 'Edit client' : 'New client'}</DialogTitle>
+        </Box>
+        <Divider />
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogContent sx={{ pt: 4 }}>
             <TextField
@@ -335,7 +339,10 @@ export function ClientsPage() {
         onClose={() => !deleteMutation.isPending && setClientToDelete(null)}
         aria-labelledby="delete-client-dialog-title"
       >
-        <DialogTitle id="delete-client-dialog-title">Are you sure?</DialogTitle>
+        <Box sx={{ bgcolor: 'grey.50' }}>
+          <DialogTitle id="delete-client-dialog-title">Are you sure?</DialogTitle>
+        </Box>
+        <Divider />
         <DialogContent>
           <DialogContentText>
             Delete client &quot;{clientToDelete?.name}&quot;? This will permanently delete the client and all their projects, phases, activities and assignments. This cannot be undone.

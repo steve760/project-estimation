@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Divider,
   TextField,
   Avatar,
   Checkbox,
@@ -424,7 +425,10 @@ export function ConsultantsPage() {
       </Card>
 
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingId ? 'Edit consultant' : 'New consultant'}</DialogTitle>
+        <Box sx={{ bgcolor: 'grey.50' }}>
+          <DialogTitle>{editingId ? 'Edit consultant' : 'New consultant'}</DialogTitle>
+        </Box>
+        <Divider />
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogContent sx={{ pt: 4, '& .MuiFormControl-root': { marginBottom: 4 } }}>
             {editingId && (

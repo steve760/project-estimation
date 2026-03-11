@@ -16,6 +16,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Divider,
   TextField,
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
@@ -319,7 +320,10 @@ export function ClientDetailPage() {
       )}
 
       <Dialog open={newProjectModalOpen} onClose={() => setNewProjectModalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>New project</DialogTitle>
+        <Box sx={{ bgcolor: 'grey.50' }}>
+          <DialogTitle>New project</DialogTitle>
+        </Box>
+        <Divider />
         <form onSubmit={handleSubmit((d) => createProjectMutation.mutate(d.name))}>
           <DialogContent sx={{ pt: 4 }}>
             <TextField

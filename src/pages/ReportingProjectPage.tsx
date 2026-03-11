@@ -518,7 +518,7 @@ export function ReportingProjectPage() {
               <CardContent>
                 <Typography variant="body2" color="text.secondary">Cost</Typography>
                 <Typography variant="h6">
-                  ${formatCurrency(toNum(totalCost))}
+                  {formatCurrency(toNum(totalCost))}
                 </Typography>
               </CardContent>
             </Card>
@@ -528,7 +528,7 @@ export function ReportingProjectPage() {
                   <CardContent>
                     <Typography variant="body2" color="text.secondary">Billable amount</Typography>
                     <Typography variant="h6">
-                      ${formatCurrency(toNum(totalBillableAmount))}
+                      {formatCurrency(toNum(totalBillableAmount))}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -536,7 +536,7 @@ export function ReportingProjectPage() {
                   <CardContent>
                     <Typography variant="body2" color="text.secondary">Profit</Typography>
                     <Typography variant="h6" color={totalProfit >= 0 ? 'success.main' : 'error.main'}>
-                      ${formatCurrency(toNum(totalProfit))}
+                      {formatCurrency(toNum(totalProfit))}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -887,18 +887,18 @@ export function ReportingProjectPage() {
                             {showFinancials && (
                               <>
                                 <TableCell align="right">
-                                  ${formatCurrency(toNum(row.cost))}
+                                  {formatCurrency(toNum(row.cost))}
                                 </TableCell>
                                 {showRevenueAndProfit && (
                                   <>
                                     <TableCell align="right">
-                                      ${formatCurrency(toNum(row.amount))}
+                                      {formatCurrency(toNum(row.amount))}
                                     </TableCell>
                                     <TableCell
                                       align="right"
                                       sx={{ color: toNum(row.profit) >= 0 ? 'success.main' : 'error.main' }}
                                     >
-                                      ${formatCurrency(toNum(row.profit))}
+                                      {formatCurrency(toNum(row.profit))}
                                     </TableCell>
                                     <TableCell
                                       align="right"
@@ -942,18 +942,18 @@ export function ReportingProjectPage() {
                           {showFinancials && (
                             <>
                               <TableCell align="right">
-                                ${formatCurrency(toNum(totalCost))}
+                                {formatCurrency(toNum(totalCost))}
                               </TableCell>
                               {showRevenueAndProfit && (
                                 <>
                                   <TableCell align="right">
-                                    ${formatCurrency(toNum(totalBillableAmount))}
+                                    {formatCurrency(toNum(totalBillableAmount))}
                                   </TableCell>
                                   <TableCell
                                     align="right"
                                     sx={{ color: toNum(totalProfit) >= 0 ? 'success.main' : 'error.main' }}
                                   >
-                                    ${formatCurrency(toNum(totalProfit))}
+                                    {formatCurrency(toNum(totalProfit))}
                                   </TableCell>
                                   <TableCell
                                     align="right"
@@ -1013,16 +1013,16 @@ export function ReportingProjectPage() {
                           {showFinancials && (
                             <>
                               <TableCell align="right">
-                                ${formatCurrency(toNum(cost))}
+                                {formatCurrency(toNum(cost))}
                               </TableCell>
                               {showRevenueAndProfit && (
                                 <>
                                   <TableCell align="right">{formatCurrency(toNum(rate))}</TableCell>
                                   <TableCell align="right">
-                                    ${formatCurrency(toNum(amount))}
+                                    {formatCurrency(toNum(amount))}
                                   </TableCell>
                                   <TableCell align="right" sx={{ color: profit >= 0 ? 'success.main' : 'error.main' }}>
-                                    ${formatCurrency(toNum(profit))}
+                                    {formatCurrency(toNum(profit))}
                                   </TableCell>
                                   <TableCell align="right" sx={{ color: gp >= 0 ? 'success.main' : 'error.main' }}>
                                     {(toNum(gp)).toFixed(1)}%
@@ -1041,16 +1041,16 @@ export function ReportingProjectPage() {
                         {showFinancials && (
                           <>
                             <TableCell align="right">
-                              ${formatCurrency(toNum(totalCost))}
+                              {formatCurrency(toNum(totalCost))}
                             </TableCell>
                             {showRevenueAndProfit && (
                               <>
                                 <TableCell />
                                 <TableCell align="right">
-                                  ${formatCurrency(toNum(totalBillableAmount))}
+                                  {formatCurrency(toNum(totalBillableAmount))}
                                 </TableCell>
                                 <TableCell align="right" sx={{ color: totalProfit >= 0 ? 'success.main' : 'error.main' }}>
-                                  ${formatCurrency(toNum(totalProfit))}
+                                  {formatCurrency(toNum(totalProfit))}
                                 </TableCell>
                                 <TableCell align="right" sx={{ color: gpPercent >= 0 ? 'success.main' : 'error.main' }}>
                                   {(toNum(gpPercent)).toFixed(1)}%

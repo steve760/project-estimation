@@ -42,6 +42,23 @@ describe('formatCurrency', () => {
     expect(formatCurrency(Number(NaN))).toBe('$0.00');
     expect(formatCurrency(undefined as unknown as number)).toBe('$0.00');
   });
+
+  it('output has exactly one leading dollar sign (no double $$)', () => {
+    expect(formatCurrency(2134).startsWith('$$')).toBe(false);
+    expect(formatCurrency(2134)[0]).toBe('$');
+    expect(formatCurrency(2134)).toBe('$2,134.00');
+  });
+
+  /** App-wide contract: currency must display as $X,XXX.00 (one $, commas, 2 decimals) */
+  it('matches app currency display contract (one $, thousands separators, two decimals)', () => {
+    const values = [0, 1, 99.9, 1200, 1234567.89, -100];
+    for (const v of values) {
+      const out = formatCurrency(v);
+      expect(out).toMatch(/^\$-?\d/);
+      expect(out).not.toMatch(/\$\$/);
+      expect(out).toMatch(/\.\d{2}$/);
+    }
+  });
 });
 
 describe('roundCurrency', () => {
@@ -49,6 +66,11 @@ describe('roundCurrency', () => {
     expect(roundCurrency(10.556)).toBe(10.56);
     expect(roundCurrency(10.554)).toBe(10.55);
     expect(roundCurrency(0)).toBe(0);
+  });
+
+  it('handles negative and large numbers', () => {
+    expect(roundCurrency(-10.555)).toBe(-10.55);
+    expect(roundCurrency(99999.994)).toBe(99999.99);
   });
 });
 
@@ -103,6 +125,24 @@ describe('computeFinancialSummary', () => {
     expect(summary.profit).toBe(0);
     expect(summary.marginPercent).toBe(0);
   });
+
+  it('profit = revenue - cost (negative when cost exceeds revenue)', () => {
+    const c = makeConsultant({ id: 'c1', cost_per_hour: 150, charge_out_rate: 100 });
+    const summary = computeFinancialSummary([{ hours: 10, consultant: c }], null);
+    expect(summary.cost).toBe(1500);
+    expect(summary.revenue).toBe(1000);
+    expect(summary.profit).toBe(-500);
+    expect(summary.marginPercent).toBe(-50); // -500/1000 * 100
+  });
+
+  it('marginPercent is (profit/revenue)*100 when revenue > 0', () => {
+    const c1 = makeConsultant({ id: 'c1', cost_per_hour: 80, charge_out_rate: 200 });
+    const summary = computeFinancialSummary([{ hours: 100, consultant: c1 }], null);
+    expect(summary.revenue).toBe(20000);
+    expect(summary.cost).toBe(8000);
+    expect(summary.profit).toBe(12000);
+    expect(summary.marginPercent).toBe(60);
+  });
 });
 
 describe('getDisplayRateAndRowBudget', () => {
@@ -125,5 +165,34 @@ describe('getDisplayRateAndRowBudget', () => {
   it('handles null/undefined rate', () => {
     expect(getDisplayRateAndRowBudget(10, null)).toEqual({ displayRate: 0, rowBudget: 0 });
     expect(getDisplayRateAndRowBudget(10, undefined)).toEqual({ displayRate: 0, rowBudget: 0 });
+  });
+});
+
+/** Mirrors reporting screens: totals and profit/gp formulas */
+describe('reporting calculations (same as ReportingProjectPage / ReportingPage)', () => {
+  it('total cost = sum(hours * cost_per_hour), total revenue = sum(hours * rate), profit = revenue - cost', () => {
+    const c1 = makeConsultant({ id: 'a', cost_per_hour: 100, charge_out_rate: 200 });
+    const c2 = makeConsultant({ id: 'b', cost_per_hour: 50, charge_out_rate: 150 });
+    const summary = computeFinancialSummary(
+      [
+        { hours: 10, consultant: c1 },
+        { hours: 20, consultant: c2 },
+      ],
+      null
+    );
+    const expectedCost = 10 * 100 + 20 * 50;
+    const expectedRevenue = 10 * 200 + 20 * 150;
+    expect(summary.cost).toBe(expectedCost);
+    expect(summary.revenue).toBe(expectedRevenue);
+    expect(summary.profit).toBe(expectedRevenue - expectedCost);
+    expect(summary.marginPercent).toBe(
+      summary.revenue > 0 ? (summary.profit / summary.revenue) * 100 : 0
+    );
+  });
+
+  it('gp percent = (profit / revenue) * 100 when revenue > 0, else 0', () => {
+    const c = makeConsultant({ id: 'x', cost_per_hour: 80, charge_out_rate: 200 });
+    const summary = computeFinancialSummary([{ hours: 50, consultant: c }], null);
+    expect(summary.marginPercent).toBe(((10000 - 4000) / 10000) * 100);
   });
 });
