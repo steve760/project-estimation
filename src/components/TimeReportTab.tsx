@@ -13,6 +13,7 @@ import {
 import { Download as DownloadIcon } from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { formatCurrency } from '../lib/calculations';
 import type { TimeEntry } from '../types/database';
 import type { Consultant, PhaseWithActivitiesDisplay, ProjectConsultantRate } from '../types/database';
 
@@ -155,7 +156,7 @@ export function TimeReportTab({
                 <TableCell align="right">{row.budgetHours.toFixed(1)}</TableCell>
                 <TableCell align="right">{row.spentHours.toFixed(1)}</TableCell>
                 <TableCell align="right">{row.remainingHours.toFixed(1)}</TableCell>
-                <TableCell align="right">${row.spentCost.toFixed(2)}</TableCell>
+                <TableCell align="right">{formatCurrency(row.spentCost)}</TableCell>
                 <TableCell sx={{ minWidth: 140 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <LinearProgress

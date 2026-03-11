@@ -55,7 +55,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Project, Phase, Activity, ActivityAssignment, Consultant, PhaseWithActivitiesDisplay, ActivityWithAssignmentsDisplay } from '../types/database';
 import type { ProjectConsultantRate } from '../types/database';
-import { computeFinancialSummary, roundCurrency } from '../lib/calculations';
+import { computeFinancialSummary, formatCurrency, roundCurrency } from '../lib/calculations';
 
 function getInitials(name: string): string {
   return name
@@ -438,11 +438,11 @@ function _SortableActivityGroupRow({
         <>
           {!nonBillable && (
             <TableCell align="right">
-              ${roundCurrency(totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              {formatCurrency(roundCurrency(totalRevenue))}
             </TableCell>
           )}
           <TableCell align="right">
-            ${roundCurrency(totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            {formatCurrency(roundCurrency(totalCost))}
           </TableCell>
         </>
       )}
@@ -503,10 +503,10 @@ function SortableTaskRow({
         return (
           <>
             <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 90 }}>
-              {displayRate > 0 ? `$${displayRate.toFixed(2)}` : '—'}
+              {displayRate > 0 ? formatCurrency(displayRate) : '—'}
             </TableCell>
             <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 100 }}>
-              {rowBudget > 0 ? `$${rowBudget.toFixed(2)}` : '—'}
+              {rowBudget > 0 ? formatCurrency(rowBudget) : '—'}
             </TableCell>
           </>
         );
@@ -1060,11 +1060,12 @@ export function ProjectDetailPage() {
   );
 
   const assignmentsForSummary = useMemo(() => {
+    if (allAssignments.length > 0) return allAssignments;
     if (totalEstimatedHours > 0 && teamConsultants.length > 0) {
       const hoursPerConsultant = totalEstimatedHours / teamConsultants.length;
       return teamConsultants.map((c) => ({ hours: hoursPerConsultant, consultant: c }));
     }
-    return allAssignments;
+    return [];
   }, [totalEstimatedHours, teamConsultants, allAssignments]);
 
   const chargeOutOverridesMap = useMemo(
@@ -1541,14 +1542,14 @@ export function ProjectDetailPage() {
               <Card>
                 <CardContent>
                   <Typography variant="body2" color="text.secondary">Estimated revenue</Typography>
-                  <Typography variant="h6">${roundCurrency(summary.revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Typography>
+                  <Typography variant="h6">{formatCurrency(roundCurrency(summary.revenue))}</Typography>
                 </CardContent>
               </Card>
             )}
             <Card>
               <CardContent>
                 <Typography variant="body2" color="text.secondary">Estimated cost</Typography>
-                <Typography variant="h6">${roundCurrency(summary.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Typography>
+                <Typography variant="h6">{formatCurrency(roundCurrency(summary.cost))}</Typography>
               </CardContent>
             </Card>
             {!nonBillable && (
@@ -1557,7 +1558,7 @@ export function ProjectDetailPage() {
                   <CardContent>
                     <Typography variant="body2" color="text.secondary">Estimated profit</Typography>
                     <Typography variant="h6" color={summary.profit >= 0 ? 'success.main' : 'error.main'}>
-                      ${roundCurrency(summary.profit).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      {formatCurrency(roundCurrency(summary.profit))}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -1673,7 +1674,7 @@ export function ProjectDetailPage() {
                             (s, t) => s + getDisplayRateAndRowBudget(t.estimatedHours, t.defaultRate).rowBudget,
                             0
                           );
-                          return totalBudget > 0 ? `$${totalBudget.toFixed(2)}` : '—';
+                          return totalBudget > 0 ? formatCurrency(totalBudget) : '—';
                         })()}
                       </TableCell>
                     </>
@@ -1884,7 +1885,7 @@ export function ProjectDetailPage() {
                           <TableCell>{c.name}</TableCell>
                           {!nonBillable && (
                             <>
-                              <TableCell align="right">${Number(c.charge_out_rate).toFixed(2)}</TableCell>
+                              <TableCell align="right">{formatCurrency(Number(c.charge_out_rate))}</TableCell>
                               <TableCell align="right">
                                 <TextField
                                   type="number"

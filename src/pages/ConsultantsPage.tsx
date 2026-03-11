@@ -24,6 +24,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
+import { formatCurrency } from '../lib/calculations';
 import { useAuth } from '../contexts/AuthContext';
 import type { Consultant } from '../types/database';
 
@@ -321,7 +322,7 @@ export function ConsultantsPage() {
             minWidth: 100,
             type: 'number' as const,
             valueGetter: (value: unknown) => (value != null && value !== '' ? Number(value) : 0),
-            valueFormatter: (v: unknown) => (v != null && v !== '' ? `$${Number(v).toFixed(2)}` : '$0.00'),
+            valueFormatter: (v: unknown) => (v != null && v !== '' ? formatCurrency(Number(v)) : formatCurrency(0)),
           },
           {
             field: 'charge_out_rate',
@@ -330,7 +331,7 @@ export function ConsultantsPage() {
             minWidth: 120,
             type: 'number' as const,
             valueGetter: (value: unknown) => (value != null && value !== '' ? Number(value) : 0),
-            valueFormatter: (v: unknown) => (v != null && v !== '' ? `$${Number(v).toFixed(2)}` : '$0.00'),
+            valueFormatter: (v: unknown) => (v != null && v !== '' ? formatCurrency(Number(v)) : formatCurrency(0)),
           },
           {
             field: 'user_id',

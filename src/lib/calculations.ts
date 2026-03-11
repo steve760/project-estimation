@@ -38,3 +38,8 @@ export function computeFinancialSummary(
 export function roundCurrency(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+/** Format a number as currency with thousands separators, e.g. $1,200.00 */
+export function formatCurrency(value: number): string {
+  return '$' + Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}

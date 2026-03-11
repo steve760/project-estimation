@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Box, Card, CardContent, Typography, Skeleton, Alert } from '@mui/material';
 import { TrendingUp, AttachMoney, People, Folder } from '@mui/icons-material';
 import { supabase } from '../lib/supabase';
+import { formatCurrency } from '../lib/calculations';
 import { useAuth } from '../contexts/AuthContext';
 import type { Consultant } from '../types/database';
 
@@ -93,8 +94,8 @@ export function DashboardPage() {
   const cards = [
     ...(isAdmin
       ? [
-          { title: 'Total cost', value: `$${summary.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, icon: <AttachMoney sx={{ fontSize: 32, color: 'primary.main' }} /> },
-          { title: 'Total revenue', value: `$${summary.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, icon: <TrendingUp sx={{ fontSize: 32, color: 'success.main' }} /> },
+          { title: 'Total cost', value: formatCurrency(summary.cost), icon: <AttachMoney sx={{ fontSize: 32, color: 'primary.main' }} /> },
+          { title: 'Total revenue', value: formatCurrency(summary.revenue), icon: <TrendingUp sx={{ fontSize: 32, color: 'success.main' }} /> },
         ]
       : []),
     { title: 'Projects', value: clientCount, icon: <People sx={{ fontSize: 32, color: 'primary.main' }} /> },
@@ -149,7 +150,7 @@ export function DashboardPage() {
                 variant="h6"
                 color={summary.profit >= 0 ? 'success.main' : 'error.main'}
               >
-                ${summary.profit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {formatCurrency(summary.profit)}
               </Typography>
             </Box>
             <Box>

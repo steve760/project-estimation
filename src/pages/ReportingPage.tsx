@@ -19,6 +19,7 @@ import {
 import WarningAmber from '@mui/icons-material/WarningAmber';
 import ArrowBack from '@mui/icons-material/ArrowBack';
 import { supabase } from '../lib/supabase';
+import { formatCurrency } from '../lib/calculations';
 import { TimePeriodNavigator } from '../components/TimePeriodNavigator';
 import { useAuth } from '../contexts/AuthContext';
 import type { TimeEntry } from '../types/database';
@@ -571,7 +572,7 @@ export function ReportingPage() {
                   <CardContent>
                     <Typography variant="body2" color="text.secondary">Billable amount</Typography>
                     <Typography variant="h6">
-                      ${toNum(summaryForDisplay.totalBillableAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      {formatCurrency(toNum(summaryForDisplay.totalBillableAmount))}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -579,7 +580,7 @@ export function ReportingPage() {
                   <CardContent>
                     <Typography variant="body2" color="text.secondary">Cost</Typography>
                     <Typography variant="h6">
-                      ${toNum(summaryForDisplay.totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      {formatCurrency(toNum(summaryForDisplay.totalCost))}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -587,7 +588,7 @@ export function ReportingPage() {
                   <CardContent>
                     <Typography variant="body2" color="text.secondary">Profit</Typography>
                     <Typography variant="h6" color={toNum(summaryForDisplay.totalProfit) >= 0 ? 'success.main' : 'error.main'}>
-                      ${toNum(summaryForDisplay.totalProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      {formatCurrency(toNum(summaryForDisplay.totalProfit))}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -632,11 +633,11 @@ export function ReportingPage() {
                           />
                           <YAxis
                             tick={{ fontSize: 11, fill: theme.palette.text.secondary }}
-                            tickFormatter={(v) => `$${v}`}
+                            tickFormatter={(v) => formatCurrency(Number(v))}
                           />
                           <Tooltip
                             formatter={(value: number | undefined, name?: string) => [
-                              `$${Number(value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+                              formatCurrency(Number(value ?? 0)),
                               name === 'cost' ? 'Cost' : name === 'margin' ? 'Margin' : name ?? '',
                             ]}
                             contentStyle={{
@@ -893,13 +894,10 @@ export function ReportingPage() {
                             {showFinancials && (
                               <>
                                 <TableCell align="right">
-                                  {row.nonBillable ? '—' : `$${toNum(row.billableAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                                  {row.nonBillable ? '—' : formatCurrency(toNum(row.billableAmount))}
                                 </TableCell>
                                 <TableCell align="right">
-                                  $
-                                  {toNum(row.cost).toLocaleString('en-US', {
-                                    minimumFractionDigits: 2,
-                                  })}
+                                  {formatCurrency(toNum(row.cost))}
                                 </TableCell>
                                 <TableCell
                                   align="right"
@@ -907,7 +905,7 @@ export function ReportingPage() {
                                     color: row.nonBillable ? undefined : profit >= 0 ? 'success.main' : 'error.main',
                                   }}
                                 >
-                                  {row.nonBillable ? '—' : `$${toNum(profit).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                                  {row.nonBillable ? '—' : formatCurrency(toNum(profit))}
                                 </TableCell>
                                 <TableCell
                                   align="right"
@@ -932,16 +930,16 @@ export function ReportingPage() {
                         {showFinancials && (
                           <>
                             <TableCell align="right">
-                              ${toNum(summaryForDisplay.totalBillableAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              {formatCurrency(toNum(summaryForDisplay.totalBillableAmount))}
                             </TableCell>
                             <TableCell align="right">
-                              ${toNum(summaryForDisplay.totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              {formatCurrency(toNum(summaryForDisplay.totalCost))}
                             </TableCell>
                             <TableCell
                               align="right"
                               sx={{ color: toNum(summaryForDisplay.totalProfit) >= 0 ? 'success.main' : 'error.main' }}
                             >
-                              ${toNum(summaryForDisplay.totalProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              {formatCurrency(toNum(summaryForDisplay.totalProfit))}
                             </TableCell>
                             <TableCell
                               align="right"

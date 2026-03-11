@@ -27,6 +27,7 @@ import {
   Legend,
 } from 'recharts';
 import { supabase } from '../lib/supabase';
+import { formatCurrency } from '../lib/calculations';
 import { TimePeriodNavigator } from '../components/TimePeriodNavigator';
 import { useAuth } from '../contexts/AuthContext';
 import type { TimeEntry } from '../types/database';
@@ -517,7 +518,7 @@ export function ReportingProjectPage() {
               <CardContent>
                 <Typography variant="body2" color="text.secondary">Cost</Typography>
                 <Typography variant="h6">
-                  ${(toNum(totalCost)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  ${formatCurrency(toNum(totalCost))}
                 </Typography>
               </CardContent>
             </Card>
@@ -527,7 +528,7 @@ export function ReportingProjectPage() {
                   <CardContent>
                     <Typography variant="body2" color="text.secondary">Billable amount</Typography>
                     <Typography variant="h6">
-                      ${(toNum(totalBillableAmount)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      ${formatCurrency(toNum(totalBillableAmount))}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -535,7 +536,7 @@ export function ReportingProjectPage() {
                   <CardContent>
                     <Typography variant="body2" color="text.secondary">Profit</Typography>
                     <Typography variant="h6" color={totalProfit >= 0 ? 'success.main' : 'error.main'}>
-                      ${(toNum(totalProfit)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      ${formatCurrency(toNum(totalProfit))}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -677,14 +678,14 @@ export function ReportingProjectPage() {
                       if (name === 'Cost') {
                         const pct = revenue > 0 ? (toNum(payload?.cost ?? 0) / revenue) * 100 : 0;
                         return [
-                          `${Number(value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} (${pct.toFixed(
+                          `${formatCurrency(Number(value ?? 0))} (${pct.toFixed(
                             1
                           )}%)`,
                           'Cost',
                         ];
                       }
                       return [
-                        Number(value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 }),
+                        formatCurrency(Number(value ?? 0)),
                         'Margin',
                       ];
                     }}
@@ -886,18 +887,18 @@ export function ReportingProjectPage() {
                             {showFinancials && (
                               <>
                                 <TableCell align="right">
-                                  ${toNum(row.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  ${formatCurrency(toNum(row.cost))}
                                 </TableCell>
                                 {showRevenueAndProfit && (
                                   <>
                                     <TableCell align="right">
-                                      ${toNum(row.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                      ${formatCurrency(toNum(row.amount))}
                                     </TableCell>
                                     <TableCell
                                       align="right"
                                       sx={{ color: toNum(row.profit) >= 0 ? 'success.main' : 'error.main' }}
                                     >
-                                      ${toNum(row.profit).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                      ${formatCurrency(toNum(row.profit))}
                                     </TableCell>
                                     <TableCell
                                       align="right"
@@ -941,18 +942,18 @@ export function ReportingProjectPage() {
                           {showFinancials && (
                             <>
                               <TableCell align="right">
-                                ${toNum(totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                ${formatCurrency(toNum(totalCost))}
                               </TableCell>
                               {showRevenueAndProfit && (
                                 <>
                                   <TableCell align="right">
-                                    ${toNum(totalBillableAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    ${formatCurrency(toNum(totalBillableAmount))}
                                   </TableCell>
                                   <TableCell
                                     align="right"
                                     sx={{ color: toNum(totalProfit) >= 0 ? 'success.main' : 'error.main' }}
                                   >
-                                    ${toNum(totalProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    ${formatCurrency(toNum(totalProfit))}
                                   </TableCell>
                                   <TableCell
                                     align="right"
@@ -1012,16 +1013,16 @@ export function ReportingProjectPage() {
                           {showFinancials && (
                             <>
                               <TableCell align="right">
-                                ${(toNum(cost)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                ${formatCurrency(toNum(cost))}
                               </TableCell>
                               {showRevenueAndProfit && (
                                 <>
-                                  <TableCell align="right">${(toNum(rate)).toFixed(2)}</TableCell>
+                                  <TableCell align="right">{formatCurrency(toNum(rate))}</TableCell>
                                   <TableCell align="right">
-                                    ${(toNum(amount)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    ${formatCurrency(toNum(amount))}
                                   </TableCell>
                                   <TableCell align="right" sx={{ color: profit >= 0 ? 'success.main' : 'error.main' }}>
-                                    ${(toNum(profit)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    ${formatCurrency(toNum(profit))}
                                   </TableCell>
                                   <TableCell align="right" sx={{ color: gp >= 0 ? 'success.main' : 'error.main' }}>
                                     {(toNum(gp)).toFixed(1)}%
@@ -1040,16 +1041,16 @@ export function ReportingProjectPage() {
                         {showFinancials && (
                           <>
                             <TableCell align="right">
-                              ${(toNum(totalCost)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              ${formatCurrency(toNum(totalCost))}
                             </TableCell>
                             {showRevenueAndProfit && (
                               <>
                                 <TableCell />
                                 <TableCell align="right">
-                                  ${(toNum(totalBillableAmount)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  ${formatCurrency(toNum(totalBillableAmount))}
                                 </TableCell>
                                 <TableCell align="right" sx={{ color: totalProfit >= 0 ? 'success.main' : 'error.main' }}>
-                                  ${(toNum(totalProfit)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  ${formatCurrency(toNum(totalProfit))}
                                 </TableCell>
                                 <TableCell align="right" sx={{ color: gpPercent >= 0 ? 'success.main' : 'error.main' }}>
                                   {(toNum(gpPercent)).toFixed(1)}%

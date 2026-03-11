@@ -31,7 +31,7 @@ import type {
   PhaseWithActivitiesDisplay,
   ActivityWithAssignmentsDisplay,
 } from '../types/database';
-import { computeFinancialSummary, roundCurrency } from '../lib/calculations';
+import { computeFinancialSummary, formatCurrency, roundCurrency } from '../lib/calculations';
 
 const projectSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -266,7 +266,7 @@ export function ClientDetailPage() {
                       <Box sx={{ textAlign: 'left' }}>
                         <Typography variant="caption" color="text.secondary">Estimated cost</Typography>
                         <Typography variant="body1" fontWeight={600}>
-                          ${roundCurrency(summary.cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          {formatCurrency(roundCurrency(summary.cost))}
                         </Typography>
                       </Box>
                       {!project.non_billable && (
@@ -274,13 +274,13 @@ export function ClientDetailPage() {
                           <Box sx={{ textAlign: 'left' }}>
                             <Typography variant="caption" color="text.secondary">Estimated revenue</Typography>
                             <Typography variant="body1" fontWeight={600}>
-                              ${roundCurrency(summary.revenue).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              {formatCurrency(roundCurrency(summary.revenue))}
                             </Typography>
                           </Box>
                           <Box sx={{ textAlign: 'left' }}>
                             <Typography variant="caption" color="text.secondary">Estimated gross profit</Typography>
                             <Typography variant="body1" fontWeight={600} color={grossProfit >= 0 ? 'success.main' : 'error.main'}>
-                              ${roundCurrency(grossProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              {formatCurrency(roundCurrency(grossProfit))}
                             </Typography>
                           </Box>
                           <Box sx={{ textAlign: 'left' }}>

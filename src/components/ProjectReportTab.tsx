@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { formatCurrency } from '../lib/calculations';
 import type { TimeEntry } from '../types/database';
 import type { Consultant, PhaseWithActivitiesDisplay, ProjectConsultantRate } from '../types/database';
 
@@ -132,13 +133,13 @@ export function ProjectReportTab({
         <Card variant="outlined" sx={{ minWidth: 140 }}>
           <CardContent>
             <Typography variant="body2" color="text.secondary">Internal costs (from time)</Typography>
-            <Typography variant="h6">${internalCost.toFixed(2)}</Typography>
+            <Typography variant="h6">{formatCurrency(internalCost)}</Typography>
           </CardContent>
         </Card>
         <Card variant="outlined" sx={{ minWidth: 140 }}>
           <CardContent>
             <Typography variant="body2" color="text.secondary">Revenue to date (from time)</Typography>
-            <Typography variant="h6">${revenueToDate.toFixed(2)}</Typography>
+            <Typography variant="h6">{formatCurrency(revenueToDate)}</Typography>
           </CardContent>
         </Card>
       </Box>
