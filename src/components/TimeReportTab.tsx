@@ -80,10 +80,10 @@ export function TimeReportTab({
     const out: TaskRow[] = [];
     for (const phase of phases) {
       for (const activity of phase.activities ?? []) {
-        const budgetHours = (activity.assignments ?? []).reduce((s, a) => s + (a.hours ?? 0), 0);
+        const budgetHours = toNum(activity.estimated_hours ?? 0);
         const spent = spentByActivity.get(activity.id) ?? { hours: 0, cost: 0 };
         const spentHours = spent.hours;
-        const remainingHours = Math.max(0, budgetHours - spentHours);
+        const remainingHours = budgetHours - spentHours;
         out.push({
           activityId: activity.id,
           activityName: activity.name,
@@ -147,7 +147,7 @@ export function TimeReportTab({
         </TableHead>
         <TableBody>
           {rows.map((row) => {
-            const pct = row.budgetHours > 0 ? Math.min(100, (row.spentHours / row.budgetHours) * 100) : 0;
+            const pct = row.budgetHours > 0 ? (row.spentHours / row.budgetHours) * 100 : 0;
             return (
               <TableRow key={row.activityId}>
                 <TableCell>{row.phaseName}</TableCell>
@@ -160,7 +160,7 @@ export function TimeReportTab({
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <LinearProgress
                       variant="determinate"
-                      value={pct}
+                      value={Math.min(100, pct)}
                       color={pct > 100 ? 'error' : 'primary'}
                       sx={{ flex: 1, height: 8, borderRadius: 1 }}
                     />

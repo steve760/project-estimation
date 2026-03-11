@@ -531,6 +531,7 @@ export function ProjectDetailPage() {
     activityId: string;
     activityName: string;
     phaseId: string;
+    phaseName: string;
     estimatedHours: number;
     defaultRate?: number | null;
   } | null>(null);
@@ -642,6 +643,14 @@ export function ProjectDetailPage() {
       const { data, error } = await supabase.from('phases').insert({ project_id, name, sort_order: count ?? 0 }).select('id').single();
       if (error) throw error;
       return data as { id: string };
+    },
+    onSuccess: () => invalidate(),
+  });
+
+  const updatePhaseMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from('phases').update({ name: name.trim() }).eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => invalidate(),
   });
@@ -1395,7 +1404,7 @@ export function ProjectDetailPage() {
 
       <Dialog
         open={!!taskToEdit}
-        onClose={() => !updateActivityMutation.isPending && !deleteActivityMutation.isPending && setTaskToEdit(null)}
+        onClose={() => !updateActivityMutation.isPending && !deleteActivityMutation.isPending && !updatePhaseMutation.isPending && setTaskToEdit(null)}
         maxWidth="sm"
         fullWidth
       >
@@ -1406,8 +1415,15 @@ export function ProjectDetailPage() {
             options={phases}
             getOptionLabel={(p) => p.name}
             value={phases.find((p) => p.id === taskToEdit?.phaseId) ?? null}
-            onChange={(_, value) => setTaskToEdit((a) => (a && value ? { ...a, phaseId: value.id } : a))}
+            onChange={(_, value) => setTaskToEdit((a) => (a && value ? { ...a, phaseId: value.id, phaseName: value.name } : a))}
             renderInput={(params) => <TextField {...params} label="Phase" />}
+          />
+          <TextField
+            fullWidth
+            label="Phase name"
+            value={taskToEdit?.phaseName ?? ''}
+            onChange={(e) => setTaskToEdit((a) => (a ? { ...a, phaseName: e.target.value } : null))}
+            placeholder="Name of this phase"
           />
           <TextField
             fullWidth
@@ -1448,18 +1464,23 @@ export function ProjectDetailPage() {
                 deleteActivityMutation.mutate(taskToEdit.activityId, { onSuccess: () => setTaskToEdit(null) });
               }
             }}
-            disabled={!taskToEdit || deleteActivityMutation.isPending || updateActivityMutation.isPending}
+            disabled={!taskToEdit || deleteActivityMutation.isPending || updateActivityMutation.isPending || updatePhaseMutation.isPending}
           >
             Delete activity
           </Button>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button onClick={() => setTaskToEdit(null)} disabled={updateActivityMutation.isPending || deleteActivityMutation.isPending}>
+            <Button onClick={() => setTaskToEdit(null)} disabled={updateActivityMutation.isPending || deleteActivityMutation.isPending || updatePhaseMutation.isPending}>
               Cancel
             </Button>
             <Button
               variant="contained"
-              onClick={() => {
+              onClick={async () => {
                 if (!taskToEdit) return;
+                const currentPhase = phases.find((p) => p.id === taskToEdit.phaseId);
+                const phaseNameTrim = taskToEdit.phaseName.trim();
+                if (currentPhase && phaseNameTrim && phaseNameTrim !== currentPhase.name) {
+                  await updatePhaseMutation.mutateAsync({ id: taskToEdit.phaseId, name: phaseNameTrim });
+                }
                 updateActivityMutation.mutate(
                   {
                     id: taskToEdit.activityId,
@@ -1471,9 +1492,9 @@ export function ProjectDetailPage() {
                   { onSuccess: () => setTaskToEdit(null) }
                 );
               }}
-              disabled={!taskToEdit?.activityName.trim() || !taskToEdit?.phaseId || updateActivityMutation.isPending || deleteActivityMutation.isPending}
+              disabled={!taskToEdit?.activityName.trim() || !taskToEdit?.phaseId || !taskToEdit?.phaseName.trim() || updateActivityMutation.isPending || updatePhaseMutation.isPending}
             >
-              {updateActivityMutation.isPending ? 'Saving…' : 'Save'}
+              {updateActivityMutation.isPending || updatePhaseMutation.isPending ? 'Saving…' : 'Save'}
             </Button>
           </Box>
         </DialogActions>
