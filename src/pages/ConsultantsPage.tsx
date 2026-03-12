@@ -18,6 +18,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Tabs,
+  Tab,
+  CardContent,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
@@ -134,6 +137,7 @@ export function ConsultantsPage() {
   const { isAdmin, profileLoading, user } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState(0);
 
   const { data: consultants = [], isLoading } = useQuery({
     queryKey: ['consultants', user?.id],
@@ -230,12 +234,16 @@ export function ConsultantsPage() {
   };
 
   const onSubmit = (data: ConsultantForm) => {
-    if (editingId) updateMutation.mutate({ id: editingId, input: { ...data, inactive: data.inactive, role: data.role } });
+    if (editingId) updateMutation.mutate({ id: editingId, input: { name: data.name, cost_per_hour: data.cost_per_hour, charge_out_rate: data.charge_out_rate, role: data.role } });
     else {
       const color = CONSULTANT_COLORS[consultants.length % CONSULTANT_COLORS.length];
       createMutation.mutate({ ...data, color, inactive: false, role: data.role ?? 'user' });
     }
   };
+
+  const activeConsultants = consultants.filter((c) => !c.inactive);
+  const inactiveConsultants = consultants.filter((c) => c.inactive);
+  const tabConsultants = activeTab === 0 ? activeConsultants : inactiveConsultants;
 
   const columns: GridColDef<Consultant>[] = [
     {
@@ -403,25 +411,62 @@ export function ConsultantsPage() {
       </Box>
 
       <Card>
-        <DataGrid
-          rows={consultants}
-          columns={columns}
-          getRowId={(r) => r.id}
-          getRowHeight={() => 65}
-          loading={isLoading}
-          autoHeight
-          onRowClick={({ row }) => openEdit(row)}
-          pageSizeOptions={[10, 25, 50]}
-          initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-          sx={{
-            border: 'none',
-            cursor: 'pointer',
-            '& .MuiDataGrid-cell:focus': { outline: 'none' },
-            '& .MuiDataGrid-cell': { alignItems: 'center', display: 'flex' },
-            '& .MuiDataGrid-columnHeaders': { bgcolor: 'grey.50' },
-            '& .MuiDataGrid-row:hover': { backgroundColor: 'secondary.light' },
-          }}
+        <Tabs
+          value={activeTab}
+          onChange={(_, v) => setActiveTab(v)}
+          sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 1.5, pb: 0, '& .MuiTab-root': { textTransform: 'none', fontWeight: 700 } }}
+        >
+          <Tab label="Active" id="consultants-tab-active" aria-controls="consultants-tabpanel-active" />
+          <Tab label="Inactive" id="consultants-tab-inactive" aria-controls="consultants-tabpanel-inactive" />
+        </Tabs>
+        <CardContent sx={{ pt: 2 }}>
+          <Box role="tabpanel" id="consultants-tabpanel-active" aria-labelledby="consultants-tab-active" hidden={activeTab !== 0}>
+            {activeTab === 0 && (
+              <DataGrid
+                rows={tabConsultants}
+                columns={columns}
+                getRowId={(r) => r.id}
+                getRowHeight={() => 65}
+                loading={isLoading}
+                autoHeight
+                onRowClick={({ row }) => openEdit(row)}
+                pageSizeOptions={[10, 25, 50]}
+                initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                      sx={{
+                  border: 'none',
+                  cursor: 'pointer',
+                  '& .MuiDataGrid-cell:focus': { outline: 'none' },
+                  '& .MuiDataGrid-cell': { alignItems: 'center', display: 'flex' },
+                  '& .MuiDataGrid-columnHeaders': { bgcolor: 'grey.50' },
+                  '& .MuiDataGrid-row:hover': { backgroundColor: 'secondary.light' },
+                }}
         />
+            )}
+          </Box>
+          <Box role="tabpanel" id="consultants-tabpanel-inactive" aria-labelledby="consultants-tab-inactive" hidden={activeTab !== 1}>
+            {activeTab === 1 && (
+              <DataGrid
+                rows={tabConsultants}
+                columns={columns}
+                getRowId={(r) => r.id}
+                getRowHeight={() => 65}
+                loading={isLoading}
+                autoHeight
+                onRowClick={({ row }) => openEdit(row)}
+                pageSizeOptions={[10, 25, 50]}
+                initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                sx={{
+                  border: 'none',
+                  cursor: 'pointer',
+                  '& .MuiDataGrid-cell:focus': { outline: 'none' },
+                  '& .MuiDataGrid-cell': { alignItems: 'center', display: 'flex' },
+                  '& .MuiDataGrid-columnHeaders': { bgcolor: 'grey.50' },
+                  '& .MuiDataGrid-row:hover': { backgroundColor: 'secondary.light' },
+                }}
+              />
+            )}
+          </Box>
+        </CardContent>
       </Card>
 
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="sm" fullWidth>
@@ -484,16 +529,6 @@ export function ConsultantsPage() {
                   </Select>
                 </FormControl>
               </>
-            )}
-            {editingId && (
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Checkbox
-                  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() used intentionally
-                  checked={!!watch('inactive')}
-                  onChange={(e) => setValue('inactive', e.target.checked)}
-                />
-                <Typography variant="body2">Inactive</Typography>
-              </Box>
             )}
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
