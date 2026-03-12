@@ -1689,15 +1689,15 @@ export function ProjectDetailPage() {
                   </Box>
                 )}
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <Table
-                    size="small"
-                    sx={{
-                      tableLayout: 'fixed',
-                      width: 1,
-                      maxWidth: 1411,
-                      '& .MuiTableCell-root': { verticalAlign: 'middle', px: 1.5, py: 0.75 },
-                    }}
-                  >
+                  <Box sx={{ width: '100%', overflowX: 'auto' }}>
+                    <Table
+                      size="small"
+                      sx={{
+                        tableLayout: 'fixed',
+                        minWidth: 1100,
+                        '& .MuiTableCell-root': { verticalAlign: 'middle', px: 1.5, py: 0.75 },
+                      }}
+                    >
             <TableHead>
               <TableRow sx={{ '& .MuiTableCell-root': { verticalAlign: 'middle' } }}>
                 <TableCell sx={{ width: 90 }} />
@@ -1778,7 +1778,8 @@ export function ProjectDetailPage() {
               )}
             </TableBody>
           </Table>
-          </DndContext>
+                  </Box>
+                </DndContext>
 
                 {addRowError && (
                   <Alert severity="error" onClose={() => setAddRowError(null)} sx={{ mt: 2 }}>
@@ -1942,53 +1943,58 @@ export function ProjectDetailPage() {
                       Select one or more consultants above to add them to the project team.
                     </Typography>
                   )}
-                  <Table size="small" sx={{ maxWidth: 560, mb: 2, '& .MuiTableCell-root': { verticalAlign: 'middle' } }}>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ fontWeight: 700 }}>Consultant</TableCell>
-                        {!nonBillable && (
-                          <>
-                            <TableCell align="right" sx={{ fontWeight: 700 }}>Default ($/hr)</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 700 }}>Override ($/hr)</TableCell>
-                          </>
-                        )}
-                        <TableCell width={80} />
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {teamConsultants.map((c) => (
-                        <TableRow key={c.id}>
-                          <TableCell>{c.name}</TableCell>
+                  <Box sx={{ width: '100%', overflowX: 'auto', mb: 2 }}>
+                    <Table
+                      size="small"
+                      sx={{ minWidth: 520, '& .MuiTableCell-root': { verticalAlign: 'middle' } }}
+                    >
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Consultant</TableCell>
                           {!nonBillable && (
                             <>
-                              <TableCell align="right">{formatCurrency(Number(c.charge_out_rate))}</TableCell>
-                              <TableCell align="right">
-                                <TextField
-                                  type="number"
-                                  size="small"
-                                  placeholder="Use default"
-                                  value={rateOverrideInputs[c.id] ?? rateOverrides.find((r) => r.consultant_id === c.id)?.charge_out_rate ?? ''}
-                                  onChange={(e) => setRateOverrideInputs((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                                  inputProps={{ min: 0, step: 0.01 }}
-                                  sx={{ width: 100 }}
-                                />
-                              </TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 700 }}>Default ($/hr)</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 700 }}>Override ($/hr)</TableCell>
                             </>
                           )}
-                          <TableCell>
-                            <IconButton
-                              size="small"
-                              onClick={() => projectId && removeConsultantFromProjectMutation.mutate({ project_id: projectId, consultant_id: c.id })}
-                              disabled={removeConsultantFromProjectMutation.isPending}
-                              aria-label={`Remove ${c.name} from project`}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </TableCell>
+                          <TableCell width={80} />
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHead>
+                      <TableBody>
+                        {teamConsultants.map((c) => (
+                          <TableRow key={c.id}>
+                            <TableCell>{c.name}</TableCell>
+                            {!nonBillable && (
+                              <>
+                                <TableCell align="right">{formatCurrency(Number(c.charge_out_rate))}</TableCell>
+                                <TableCell align="right">
+                                  <TextField
+                                    type="number"
+                                    size="small"
+                                    placeholder="Use default"
+                                    value={rateOverrideInputs[c.id] ?? rateOverrides.find((r) => r.consultant_id === c.id)?.charge_out_rate ?? ''}
+                                    onChange={(e) => setRateOverrideInputs((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                                    inputProps={{ min: 0, step: 0.01 }}
+                                    sx={{ width: 100 }}
+                                  />
+                                </TableCell>
+                              </>
+                            )}
+                            <TableCell>
+                              <IconButton
+                                size="small"
+                                onClick={() => projectId && removeConsultantFromProjectMutation.mutate({ project_id: projectId, consultant_id: c.id })}
+                                disabled={removeConsultantFromProjectMutation.isPending}
+                                aria-label={`Remove ${c.name} from project`}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
                   {teamConsultants.length > 0 && !nonBillable && hasRateOverrideChanges && (
                     <Button
                       size="small"
