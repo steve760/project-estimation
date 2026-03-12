@@ -34,7 +34,15 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import { Delete as DeleteIcon, Save as SaveIcon, ContentCopy as CopyIcon, DragIndicator as DragIcon, Settings as SettingsIcon, Edit as EditIcon } from '@mui/icons-material';
+import {
+  Delete as DeleteIcon,
+  Save as SaveIcon,
+  ContentCopy as CopyIcon,
+  DragIndicator as DragIcon,
+  Settings as SettingsIcon,
+  Edit as EditIcon,
+  MoreVert as MoreIcon,
+} from '@mui/icons-material';
 import {
   DndContext,
   closestCenter,
@@ -466,6 +474,17 @@ function SortableTaskRow({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition };
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const menuOpen = Boolean(menuAnchorEl);
+
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+    setMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+  };
   return (
     <TableRow
       ref={setNodeRef}
@@ -496,16 +515,62 @@ function SortableTaskRow({
         );
       })()}
       <TableCell sx={{ width: 221 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <IconButton size="small" onClick={() => onEdit(task)} title="Edit activity" sx={{ p: 0.75 }}>
-            <EditIcon fontSize="small" />
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+          <IconButton
+            size="small"
+            aria-label="More actions"
+            aria-controls={menuOpen ? `task-actions-menu-${id}` : undefined}
+            aria-haspopup="true"
+            aria-expanded={menuOpen ? 'true' : undefined}
+            onClick={handleMenuClick}
+            sx={{ p: 0.75 }}
+          >
+            <MoreIcon fontSize="small" />
           </IconButton>
-          <IconButton size="small" onClick={() => onDuplicate(task)} title="Duplicate" sx={{ p: 0.75 }}>
-            <CopyIcon fontSize="small" />
-          </IconButton>
-          <IconButton size="small" onClick={() => onDelete(task)} title="Delete activity" sx={{ p: 0.75 }}>
-            <DeleteIcon fontSize="small" />
-          </IconButton>
+          <Menu
+            id={`task-actions-menu-${id}`}
+            anchorEl={menuAnchorEl}
+            open={menuOpen}
+            onClose={handleMenuClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MenuItem
+              onClick={() => {
+                handleMenuClose();
+                onEdit(task);
+              }}
+            >
+              <ListItemIcon>
+                <EditIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary="Edit activity" />
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleMenuClose();
+                onDuplicate(task);
+              }}
+            >
+              <ListItemIcon>
+                <CopyIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary="Duplicate" />
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleMenuClose();
+                onDelete(task);
+              }}
+              sx={{ color: 'error.main' }}
+            >
+              <ListItemIcon>
+                <DeleteIcon fontSize="small" color="error" />
+              </ListItemIcon>
+              <ListItemText primary="Delete activity" />
+            </MenuItem>
+          </Menu>
         </Box>
       </TableCell>
     </TableRow>
