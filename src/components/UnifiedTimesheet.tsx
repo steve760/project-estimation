@@ -142,7 +142,6 @@ export function UnifiedTimesheet({ projects, consultantId, isAdmin }: UnifiedTim
     enabled: phaseIds.length > 0,
   });
 
-  const phaseMap = useMemo(() => new Map(phasesList.map((p) => [p.id, p])), [phasesList]);
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
 
   const activitiesByPhaseId = useMemo(() => {
