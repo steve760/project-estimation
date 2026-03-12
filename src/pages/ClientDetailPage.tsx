@@ -53,13 +53,13 @@ async function fetchClientWithProjects(clientId: string) {
   if (clientError || !client) throw new Error('Client not found');
   const projectList = (projects ?? []) as Project[];
 
-  if (projectList.length === 0) return { client: client as Client, projects: [] };
+  if (projectList.length === 0) return { client: client as Client, projects: [], projectTeamByProjectId: {} };
 
   const projectIds = projectList.map((p) => p.id);
   const { data: allPhases } = await supabase.from('phases').select('*').in('project_id', projectIds).order('sort_order');
   const phasesList = (allPhases ?? []) as Phase[];
   if (phasesList.length === 0) {
-    return { client: client as Client, projects: projectList.map((p) => ({ ...p, phases: [] })) };
+    return { client: client as Client, projects: projectList.map((p) => ({ ...p, phases: [] })), projectTeamByProjectId: {} };
   }
 
   const phaseIds = phasesList.map((p) => p.id);
@@ -75,6 +75,7 @@ async function fetchClientWithProjects(clientId: string) {
     return {
       client: client as Client,
       projects: projectList.map((p) => ({ ...p, phases: phasesByProject.get(p.id) ?? [] })),
+      projectTeamByProjectId: {},
     };
   }
 
@@ -115,7 +116,26 @@ async function fetchClientWithProjects(clientId: string) {
     ...p,
     phases: phasesByProject.get(p.id) ?? [],
   }));
-  return { client: client as Client, projects: projectsWithPhases };
+
+  const projectTeamByProjectId: Record<string, Consultant[]> = {};
+  const { data: pcRows } = await supabase
+    .from('project_consultants')
+    .select('project_id, consultant_id')
+    .in('project_id', projectIds);
+  const teamConsultantIds = [...new Set((pcRows ?? []).map((r: { consultant_id: string }) => r.consultant_id))];
+  const { data: teamConsultantsList } = teamConsultantIds.length
+    ? await supabase.from('consultants').select('*').in('id', teamConsultantIds)
+    : { data: [] };
+  const teamConsultantMap = new Map(((teamConsultantsList ?? []) as Consultant[]).map((c) => [c.id, c]));
+  for (const row of pcRows ?? []) {
+    const r = row as { project_id: string; consultant_id: string };
+    const consultant = teamConsultantMap.get(r.consultant_id);
+    if (!consultant) continue;
+    if (!projectTeamByProjectId[r.project_id]) projectTeamByProjectId[r.project_id] = [];
+    projectTeamByProjectId[r.project_id].push(consultant);
+  }
+
+  return { client: client as Client, projects: projectsWithPhases, projectTeamByProjectId };
 }
 
 export function ClientDetailPage() {
@@ -127,7 +147,11 @@ export function ClientDetailPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['client', clientId],
-    queryFn: (): Promise<{ client: Client; projects: ProjectWithDetails[] }> => fetchClientWithProjects(clientId!),
+    queryFn: (): Promise<{
+      client: Client;
+      projects: ProjectWithDetails[];
+      projectTeamByProjectId: Record<string, Consultant[]>;
+    }> => fetchClientWithProjects(clientId!),
     enabled: !!clientId,
   });
 
@@ -173,7 +197,7 @@ export function ClientDetailPage() {
     );
   }
 
-  const { client, projects } = data;
+  const { client, projects, projectTeamByProjectId = {} } = data ?? {};
 
   const visibleProjects = isAdmin || !consultantId
     ? projects
@@ -226,6 +250,24 @@ export function ClientDetailPage() {
           const nonBillable = Boolean(project.non_billable);
           let revenue = assignmentSummary.revenue;
           let cost = assignmentSummary.cost;
+          const totalEstimatedHours = (project.phases ?? []).reduce(
+            (sum, phase) =>
+              sum +
+              (phase.activities ?? []).reduce(
+                (s, act) => s + (Number((act as Activity).estimated_hours) || 0),
+                0
+              ),
+            0
+          );
+          const teamConsultants = projectTeamByProjectId?.[project.id] ?? [];
+          if (cost === 0 && totalEstimatedHours > 0 && teamConsultants.length > 0) {
+            const hoursPerConsultant = totalEstimatedHours / teamConsultants.length;
+            const syntheticSummary = computeFinancialSummary(
+              teamConsultants.map((c) => ({ hours: hoursPerConsultant, consultant: c }))
+            );
+            cost = syntheticSummary.cost;
+            if (revenue === 0 && !nonBillable) revenue = syntheticSummary.revenue;
+          }
           if (!nonBillable) {
             const revenueFromTaskRates = (() => {
               let sum = 0;
