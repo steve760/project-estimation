@@ -491,13 +491,13 @@ function SortableTaskRow({
       style={style}
       sx={{ bgcolor: isDragging ? 'action.hover' : undefined, '& .MuiTableCell-root': { verticalAlign: 'middle' } }}
     >
-      <TableCell sx={{ width: 90, p: 0.5, cursor: isDragging ? 'grabbing' : 'grab' }} {...listeners} {...attributes}>
+      <TableCell sx={{ width: 56, p: 0.5, cursor: isDragging ? 'grabbing' : 'grab' }} {...listeners} {...attributes}>
         <DragIcon fontSize="small" color="action" />
       </TableCell>
-      <TableCell sx={{ width: 277, ...(isFirstInPhase ? { fontWeight: 700 } : {}) }}>{isFirstInPhase ? task.phaseName : ''}</TableCell>
-      <TableCell sx={{ width: 403 }}>{task.activityName}</TableCell>
+      <TableCell sx={{ ...(isFirstInPhase ? { fontWeight: 700 } : {}), pr: 1 }}>{isFirstInPhase ? task.phaseName : ''}</TableCell>
+      <TableCell sx={{ pr: 1 }}>{task.activityName}</TableCell>
       {showHours && (
-        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 162, pl: 1 }}>
+        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', pl: 1 }}>
           {task.estimatedHours > 0 ? task.estimatedHours : '—'}
         </TableCell>
       )}
@@ -505,16 +505,16 @@ function SortableTaskRow({
         const { displayRate, rowBudget } = getDisplayRateAndRowBudget(task.estimatedHours, task.defaultRate);
         return (
           <>
-            <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 90 }}>
+            <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
               {displayRate > 0 ? formatCurrency(displayRate) : '—'}
             </TableCell>
-            <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 100 }}>
+            <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
               {rowBudget > 0 ? formatCurrency(rowBudget) : '—'}
             </TableCell>
           </>
         );
       })()}
-      <TableCell sx={{ width: 221 }}>
+      <TableCell sx={{ whiteSpace: 'nowrap' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           <IconButton
             size="small"
@@ -1689,30 +1689,30 @@ export function ProjectDetailPage() {
                   </Box>
                 )}
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <Box sx={{ width: '100%', overflowX: 'auto' }}>
+                  <Box sx={{ width: '100%' }}>
                     <Table
                       size="small"
                       sx={{
-                        tableLayout: 'fixed',
-                        minWidth: 1100,
+                        tableLayout: 'auto',
+                        width: '100%',
                         '& .MuiTableCell-root': { verticalAlign: 'middle', px: 1.5, py: 0.75 },
                       }}
                     >
             <TableHead>
               <TableRow sx={{ '& .MuiTableCell-root': { verticalAlign: 'middle' } }}>
-                <TableCell sx={{ width: 90 }} />
-                <TableCell sx={{ fontWeight: 700, width: 277 }}>Phase</TableCell>
-                <TableCell sx={{ fontWeight: 700, width: 403 }}>Activity</TableCell>
+                <TableCell sx={{ width: 56 }} />
+                <TableCell sx={{ fontWeight: 700 }}>Phase</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Activity</TableCell>
                 {!nonBillable && (
-                  <TableCell align="right" sx={{ fontWeight: 700, width: 162, pl: 1 }}>Hours</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, whiteSpace: 'nowrap', pl: 1 }}>Hours</TableCell>
                 )}
                 {!nonBillable && (
                   <>
-                    <TableCell align="right" sx={{ fontWeight: 700, width: 90 }}>Rate ($/hr)</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700, width: 100 }}>Budget</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Rate ($/hr)</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Budget</TableCell>
                   </>
                 )}
-                <TableCell sx={{ fontWeight: 700, width: 221 }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1735,16 +1735,16 @@ export function ProjectDetailPage() {
               </SortableContext>
               {taskRows.length > 0 && (
                 <TableRow sx={{ fontWeight: 700, bgcolor: 'grey.50', '& .MuiTableCell-root': { fontWeight: 700 } }}>
-                  <TableCell sx={{ width: 90 }} />
-                  <TableCell sx={{ width: 277 }} />
-                  <TableCell sx={{ width: 403 }}>Total</TableCell>
+                  <TableCell />
+                  <TableCell />
+                  <TableCell>Total</TableCell>
                   {!nonBillable && (
                     <>
-                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 162, pl: 1 }}>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', pl: 1 }}>
                         {taskRows.reduce((s, t) => s + t.estimatedHours, 0).toFixed(2)}
                       </TableCell>
-                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 90 }}>—</TableCell>
-                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', width: 100 }}>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>—</TableCell>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                         {(() => {
                           const totalBudget = taskRows.reduce(
                             (s, t) => s + getDisplayRateAndRowBudget(t.estimatedHours, t.defaultRate).rowBudget,
@@ -1755,7 +1755,7 @@ export function ProjectDetailPage() {
                       </TableCell>
                     </>
                   )}
-                  <TableCell sx={{ width: 221 }} />
+                  <TableCell />
                 </TableRow>
               )}
               {addRowError && (

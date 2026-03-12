@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import {
   Box,
+  AppBar,
   Drawer,
+  Toolbar,
   List,
   ListItemButton,
   ListItemIcon,
@@ -15,6 +18,7 @@ import {
   Business as BusinessIcon,
   Schedule as TimesheetsIcon,
   Assessment as ReportingIcon,
+  Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,6 +39,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut, isAdmin } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const allNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
@@ -45,8 +50,8 @@ export function AppLayout() {
 
   const drawer = (
     <Box sx={{ py: 2, px: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ px: 2, pb: 2, display: 'flex', justifyContent: 'flex-start' }}>
-        <img src="/logo.png" alt="Purple Shirt" style={{ maxHeight: 29, width: 'auto' }} />
+      <Box sx={{ px: 1, pb: 2, display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
+        <img src="/logo.png" alt="Purple Shirt" style={{ maxHeight: 22, width: 'auto', marginLeft: 12 }} />
       </Box>
       <List disablePadding sx={{ flex: 1 }}>
         {allNavItems.map(({ path, label, icon }) => (
@@ -87,10 +92,37 @@ export function AppLayout() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+      {isMobile && (
+        <AppBar
+          position="fixed"
+          elevation={0}
+          color="inherit"
+          sx={{
+            borderBottom: 1,
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+          }}
+        >
+          <Toolbar sx={{ minHeight: 64, px: 2 }}>
+            <IconButton
+              edge="start"
+              color="inherit"
+              aria-label="Open navigation"
+              onClick={() => setMobileOpen(true)}
+              sx={{ mr: 1 }}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <img src="/logo.png" alt="Purple Shirt" style={{ maxHeight: 22, width: 'auto' }} />
+            </Box>
+          </Toolbar>
+        </AppBar>
+      )}
       <Drawer
         variant={isMobile ? 'temporary' : 'permanent'}
-        open={!isMobile}
-        onClose={() => {}}
+        open={isMobile ? mobileOpen : true}
+        onClose={() => setMobileOpen(false)}
         sx={{
           width: DRAWER_WIDTH,
           flexShrink: 0,
@@ -113,7 +145,9 @@ export function AppLayout() {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          px: 3,
+          py: 3,
+          pt: isMobile ? 10 : 3,
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           minHeight: '100vh',
         }}
