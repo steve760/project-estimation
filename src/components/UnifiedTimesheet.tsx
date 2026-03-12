@@ -116,11 +116,11 @@ export function UnifiedTimesheet({ projects, consultantId, isAdmin }: UnifiedTim
       if (projectIds.length === 0) return [];
       const { data, error } = await supabase
         .from('phases')
-        .select('id, project_id, name')
+        .select('id, project_id, name, sort_order')
         .in('project_id', projectIds)
         .order('sort_order');
       if (error) throw error;
-      return (data ?? []) as { id: string; project_id: string; name: string }[];
+      return (data ?? []) as { id: string; project_id: string; name: string; sort_order: number }[];
     },
     enabled: projectIds.length > 0,
   });
@@ -133,11 +133,11 @@ export function UnifiedTimesheet({ projects, consultantId, isAdmin }: UnifiedTim
       if (phaseIds.length === 0) return [];
       const { data, error } = await supabase
         .from('activities')
-        .select('id, phase_id, name')
+        .select('id, phase_id, name, sort_order')
         .in('phase_id', phaseIds)
         .order('sort_order');
       if (error) throw error;
-      return (data ?? []) as { id: string; phase_id: string; name: string }[];
+      return (data ?? []) as { id: string; phase_id: string; name: string; sort_order: number }[];
     },
     enabled: phaseIds.length > 0,
   });
@@ -145,24 +145,40 @@ export function UnifiedTimesheet({ projects, consultantId, isAdmin }: UnifiedTim
   const phaseMap = useMemo(() => new Map(phasesList.map((p) => [p.id, p])), [phasesList]);
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
 
+  const activitiesByPhaseId = useMemo(() => {
+    const map = new Map<string, { id: string; phase_id: string; name: string; sort_order: number }[]>();
+    for (const a of activitiesList) {
+      const list = map.get(a.phase_id) ?? [];
+      list.push(a);
+      map.set(a.phase_id, list);
+    }
+    for (const list of map.values()) list.sort((x, y) => (x.sort_order ?? 0) - (y.sort_order ?? 0));
+    return map;
+  }, [activitiesList]);
+
   const activityOptions = useMemo((): ActivityOption[] => {
     const out: ActivityOption[] = [];
-    for (const a of activitiesList) {
-      const phase = phaseMap.get(a.phase_id);
-      const proj = phase && projectMap.get(phase.project_id);
-      if (!phase || !proj) continue;
-      const clientName = (proj.client as { name?: string })?.name ?? '—';
-      out.push({
-        projectId: phase.project_id,
-        projectName: proj.name,
-        clientName,
-        activityId: a.id,
-        phaseName: phase.name,
-        activityName: a.name,
-      });
+    for (const proj of projects) {
+      const projectPhases = phasesList
+        .filter((p) => p.project_id === proj.id)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      for (const phase of projectPhases) {
+        const phaseActivities = activitiesByPhaseId.get(phase.id) ?? [];
+        for (const a of phaseActivities) {
+          const clientName = (proj.client as { name?: string })?.name ?? '—';
+          out.push({
+            projectId: proj.id,
+            projectName: proj.name,
+            clientName,
+            activityId: a.id,
+            phaseName: phase.name,
+            activityName: a.name,
+          });
+        }
+      }
     }
     return out;
-  }, [activitiesList, phaseMap, projectMap]);
+  }, [projects, phasesList, activitiesByPhaseId]);
 
   const { data: timeEntries = [], isLoading } = useQuery({
     queryKey: ['time_entries_unified', effectiveConsultantId, weekStartStr],
@@ -574,8 +590,15 @@ export function UnifiedTimesheet({ projects, consultantId, isAdmin }: UnifiedTim
                 open={!!addRowAnchor}
                 onClose={() => setAddRowAnchor(null)}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                sx={{ maxHeight: 400, '& .MuiList-root': { py: 0 } }}
-                PaperProps={{ sx: { py: 1 } }}
+                sx={{ '& .MuiList-root': { py: 0 } }}
+                PaperProps={{ sx: { py: 0, overflow: 'visible' } }}
+                MenuListProps={{
+                  sx: {
+                    maxHeight: 400,
+                    overflow: 'auto',
+                    py: 0,
+                  },
+                }}
               >
                 {activitiesNotOnSheetByProjectAndPhase.map(({ projectId, projectName, phases }) => (
                   <Fragment key={projectId}>
@@ -586,15 +609,31 @@ export function UnifiedTimesheet({ projects, consultantId, isAdmin }: UnifiedTim
                         lineHeight: 2,
                         py: 1,
                         px: 2,
-                        bgcolor: 'primary.main',
-                        color: 'primary.contrastText',
+                        bgcolor: 'primary.light',
+                        color: 'primary.dark',
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 2,
                       }}
                     >
                       {projectName}
                     </ListSubheader>
                     {phases.map(({ phaseName, options }) => (
                       <Fragment key={`${projectId}-${phaseName}`}>
-                        <ListSubheader component="div" sx={{ fontWeight: 700, fontSize: '0.8125rem', lineHeight: 1.8, py: 0.75, px: 2 }}>
+                        <ListSubheader
+                          component="div"
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: '0.8125rem',
+                            lineHeight: 1.8,
+                            py: 0.75,
+                            px: 2,
+                            backgroundColor: 'secondary.light',
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 1,
+                          }}
+                        >
                           {phaseName}
                         </ListSubheader>
                         {options.map((opt) => (
