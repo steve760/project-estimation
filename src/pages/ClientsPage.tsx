@@ -15,6 +15,7 @@ import {
   TextField,
   Avatar,
   IconButton,
+  Chip,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
@@ -24,63 +25,25 @@ import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Client } from '../types/database';
-import type { Consultant } from '../types/database';
-import { computeFinancialSummary } from '../lib/calculations';
+type ProjectCounts = { active: number; proposal: number };
 
-async function fetchClientAverageGp(clientIds: string[]): Promise<Record<string, number>> {
+async function fetchProjectCountsByClient(clientIds: string[]): Promise<Record<string, ProjectCounts>> {
   if (clientIds.length === 0) return {};
-  const { data: projects } = await supabase.from('projects').select('id, client_id').in('client_id', clientIds);
-  const projectList = projects ?? [];
-  if (projectList.length === 0) return {};
-  const projectIds = projectList.map((p) => p.id);
-  const { data: phases } = await supabase.from('phases').select('id, project_id').in('project_id', projectIds);
-  const phasesList = phases ?? [];
-  const phaseIds = phasesList.map((p) => p.id);
-  if (phaseIds.length === 0) return {};
-  const { data: activities } = await supabase.from('activities').select('id, phase_id').in('phase_id', phaseIds);
-  const activitiesList = activities ?? [];
-  const activityIds = activitiesList.map((a) => a.id);
-  if (activityIds.length === 0) return {};
-  const [assignmentsRes, consultantIdsRes] = await Promise.all([
-    supabase.from('activity_assignments').select('*').in('activity_id', activityIds),
-    supabase.from('activity_assignments').select('consultant_id').in('activity_id', activityIds),
-  ]);
-  const assignmentsList = (assignmentsRes.data ?? []) as { id: string; activity_id: string; consultant_id: string | null; hours: number }[];
-  const cIds = [...new Set((consultantIdsRes.data ?? []).map((a: { consultant_id: string | null }) => a.consultant_id).filter(Boolean))] as string[];
-  const { data: consultantsList } = cIds.length ? await supabase.from('consultants').select('*').in('id', cIds) : { data: [] };
-  const consultantMap = new Map(((consultantsList ?? []) as Consultant[]).map((c) => [c.id, c]));
-  const activityToPhase = new Map<string, string>();
-  for (const a of activitiesList) activityToPhase.set(a.id, a.phase_id);
-  const phaseToProject = new Map<string, string>();
-  for (const p of phasesList) phaseToProject.set(p.id, p.project_id);
-  const projectToClient = new Map<string, string>();
-  for (const p of projectList) projectToClient.set(p.id, p.client_id);
-  const projectAssignments = new Map<string, { hours: number; consultant: Consultant }[]>();
-  for (const a of assignmentsList) {
-    if (!a.consultant_id) continue;
-    const consultant = consultantMap.get(a.consultant_id);
-    if (!consultant) continue;
-    const phaseId = activityToPhase.get(a.activity_id);
-    const projectId = phaseId ? phaseToProject.get(phaseId) : undefined;
-    if (!projectId) continue;
-    const list = projectAssignments.get(projectId) ?? [];
-    list.push({ hours: a.hours, consultant });
-    projectAssignments.set(projectId, list);
-  }
-  const clientMargins = new Map<string, number[]>();
-  for (const proj of projectList) {
-    const assignments = projectAssignments.get(proj.id) ?? [];
-    const summary = computeFinancialSummary(assignments);
-    const clientId = proj.client_id;
-    const list = clientMargins.get(clientId) ?? [];
-    list.push(summary.marginPercent);
-    clientMargins.set(clientId, list);
-  }
-  const result: Record<string, number> = {};
+  const { data: projects } = await supabase
+    .from('projects')
+    .select('client_id, status')
+    .in('client_id', clientIds);
+  const list = projects ?? [];
+  const result: Record<string, ProjectCounts> = {};
   for (const clientId of clientIds) {
-    const margins = clientMargins.get(clientId) ?? [];
-    if (margins.length === 0) continue;
-    result[clientId] = margins.reduce((a, b) => a + b, 0) / margins.length;
+    result[clientId] = { active: 0, proposal: 0 };
+  }
+  for (const p of list) {
+    const clientId = p.client_id;
+    const status = (p as { status?: string }).status ?? 'proposal';
+    if (!result[clientId]) result[clientId] = { active: 0, proposal: 0 };
+    if (status === 'active') result[clientId].active += 1;
+    else result[clientId].proposal += 1;
   }
   return result;
 }
@@ -153,13 +116,16 @@ export function ClientsPage() {
   });
 
   const clientIds = clients.map((c) => c.id);
-  const { data: averageGpByClient = {} } = useQuery({
-    queryKey: ['clients', 'average-gp', clientIds],
-    queryFn: () => fetchClientAverageGp(clientIds),
+  const { data: projectCountsByClient = {} } = useQuery({
+    queryKey: ['clients', 'project-counts', clientIds],
+    queryFn: () => fetchProjectCountsByClient(clientIds),
     enabled: clientIds.length > 0,
   });
 
-  const rows = clients.map((c) => ({ ...c, averageGpPercent: averageGpByClient[c.id] }));
+  const rows = clients.map((c) => ({
+    ...c,
+    projectCounts: projectCountsByClient[c.id] ?? { active: 0, proposal: 0 },
+  }));
 
   const createMutation = useMutation({
     mutationFn: createClient,
@@ -212,7 +178,9 @@ export function ClientsPage() {
     }
   };
 
-  const columns: GridColDef<Client & { averageGpPercent?: number }>[] = [
+  type ClientRow = Client & { projectCounts: ProjectCounts };
+
+  const columns: GridColDef<ClientRow>[] = [
     {
       field: 'name',
       headerName: 'Client name',
@@ -229,28 +197,31 @@ export function ClientsPage() {
         </Box>
       ),
     },
-    ...(isAdmin
-      ? [
-          {
-            field: 'averageGpPercent',
-            headerName: 'Average GP %',
-            width: 120,
-            type: 'number' as const,
-            align: 'left' as const,
-            headerAlign: 'left' as const,
-            valueGetter: (_: unknown, row: Client & { averageGpPercent?: number }) => row.averageGpPercent,
-            renderCell: ({ row }: { row: Client & { averageGpPercent?: number } }) => {
-              const value = row.averageGpPercent;
-              if (value == null) return <Typography variant="body2" color="text.secondary">—</Typography>;
-              return (
-                <Typography variant="body2" fontWeight={500} color={value >= 0 ? 'success.main' : 'error.main'}>
-                  {value.toFixed(1)}%
-                </Typography>
-              );
-            },
-          },
-        ]
-      : []),
+    {
+      field: 'projectCounts',
+      headerName: 'Projects',
+      width: 180,
+      sortable: false,
+      valueGetter: (_: unknown, row: ClientRow) => row.projectCounts,
+      renderCell: ({ row }: { row: ClientRow }) => {
+        const { active, proposal } = row.projectCounts;
+        return (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
+            {active > 0 && (
+              <Chip size="small" label={`${active} active`} color="success" variant="outlined" />
+            )}
+            {proposal > 0 && (
+              <Chip size="small" label={`${proposal} proposal${proposal !== 1 ? 's' : ''}`} variant="outlined" />
+            )}
+            {active === 0 && proposal === 0 && (
+              <Typography variant="body2" color="text.secondary">
+                No projects
+              </Typography>
+            )}
+          </Box>
+        );
+      },
+    },
     {
       field: 'actions',
       headerName: '',
