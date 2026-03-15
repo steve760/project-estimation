@@ -23,7 +23,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
 import type { Client } from '../types/database';
 type ProjectCounts = { active: number; proposal: number };
 
@@ -105,7 +104,6 @@ async function deleteClient(id: string) {
 export function ClientsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
